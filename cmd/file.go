@@ -39,11 +39,6 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	owner := viper.GetString("owner")
-	repo := viper.GetString("repo")
-	branch := viper.GetString("branch")
-	message := viper.GetString("message")
-
 	filePath := args[0]
 	contentArg := viper.GetString("content")
 	var fileReader io.Reader

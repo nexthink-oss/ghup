@@ -34,11 +34,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	owner := viper.GetString("owner")
-	repo := viper.GetString("repo")
-	branch := viper.GetString("branch")
 	branchRefName := fmt.Sprintf("heads/%s", branch)
-	message := viper.GetString("message")
 
 	tagName := args[0]
 	tagRefName := fmt.Sprintf("tags/%s", tagName)

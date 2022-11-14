@@ -12,6 +12,12 @@ import (
 	"github.com/spf13/viper"
 )
 
+var token string
+var owner string
+var repo string
+var branch string
+var message string
+
 var rootCmd = &cobra.Command{
 	Use:               "ghup",
 	Short:             "Update GitHub content and tags via API",
@@ -82,25 +88,27 @@ func initLogger() {
 }
 
 func validateFlags(cmd *cobra.Command, args []string) error {
-	token := viper.GetString("token")
+	token = viper.GetString("token")
 	if token == "" {
 		return fmt.Errorf("invalid token: '%+v'", token)
 	}
 
-	owner := viper.GetString("owner")
+	owner = viper.GetString("owner")
 	if owner == "" {
 		return fmt.Errorf("invalid owner: '%+v'", owner)
 	}
 
-	repo := viper.GetString("repo")
+	repo = viper.GetString("repo")
 	if repo == "" {
 		return fmt.Errorf("invalid repo: '%+v'", repo)
 	}
 
-	branch := viper.GetString("branch")
+	branch = viper.GetString("branch")
 	if branch == "" {
 		return fmt.Errorf("invalid branch: '%+v'", branch)
 	}
+
+	message = viper.GetString("message")
 
 	return nil
 }
