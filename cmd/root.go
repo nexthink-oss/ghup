@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/isometry/ghup/internal/gitutil"
@@ -12,9 +13,10 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:          "ghup",
-	Short:        "Update GitHub content and tags via API",
-	SilenceUsage: true,
+	Use:               "ghup",
+	Short:             "Update GitHub content and tags via API",
+	SilenceUsage:      true,
+	PersistentPreRunE: validateFlags,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -77,4 +79,28 @@ func initLogger() {
 
 	verbosity := viper.GetInt("verbosity")
 	log.SetLevel(log.Level(int(log.ErrorLevel) - verbosity))
+}
+
+func validateFlags(cmd *cobra.Command, args []string) error {
+	token := viper.GetString("token")
+	if token == "" {
+		return fmt.Errorf("invalid token: '%+v'", token)
+	}
+
+	owner := viper.GetString("owner")
+	if owner == "" {
+		return fmt.Errorf("invalid owner: '%+v'", owner)
+	}
+
+	repo := viper.GetString("repo")
+	if repo == "" {
+		return fmt.Errorf("invalid repo: '%+v'", repo)
+	}
+
+	branch := viper.GetString("branch")
+	if branch == "" {
+		return fmt.Errorf("invalid branch: '%+v'", branch)
+	}
+
+	return nil
 }
