@@ -7,41 +7,45 @@ import (
 	giturls "github.com/whilp/git-urls"
 )
 
-type GithubRepo struct {
+type Remote struct {
+	Local      *git.Repository
+	GitHub     bool
 	Owner      string
 	Repository string
 	Branch     string
 }
 
-func GithubRepoFromPath(path string) (*GithubRepo, bool) {
+func NewRemote(path string) (ghr *Remote) {
+
 	options := &git.PlainOpenOptions{
 		DetectDotGit: true,
 	}
 	repo, err := git.PlainOpenWithOptions(path, options)
 	if err != nil {
-		return nil, false
+		return nil
 	}
+	ghr.Local = repo
+
 	remotes, err := repo.Remotes()
 	if err != nil {
-		return nil, false
+		return nil
 	}
 
 	for _, remote := range remotes {
 		remoteConfig := *remote.Config()
 		if o, r, ok := parseRemote(remoteConfig.URLs[0]); ok {
-			gh := &GithubRepo{
-				Owner:      o,
-				Repository: r,
-				Branch:     "main",
-			}
+			ghr.GitHub = true
+			ghr.Owner = o
+			ghr.Repository = r
+			ghr.Branch = "main"
 			head, err := repo.Head()
 			if err == nil {
-				gh.Branch = head.Name().Short()
+				ghr.Branch = head.Name().Short()
 			}
-			return gh, true
+			return ghr
 		}
 	}
-	return nil, false
+	return nil
 }
 
 func parseRemote(remote string) (owner string, repo string, ok bool) {

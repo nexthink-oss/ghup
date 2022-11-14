@@ -44,11 +44,11 @@ func init() {
 	var defaultRepo string
 	defaultBranch := "main"
 
-	githubRepo, _ := gitutil.GithubRepoFromPath(cwd)
-	if githubRepo != nil {
-		defaultOwner = githubRepo.Owner
-		defaultRepo = githubRepo.Repository
-		defaultBranch = githubRepo.Branch
+	remote := gitutil.NewRemote(cwd)
+	if remote.GitHub {
+		defaultOwner = remote.Owner
+		defaultRepo = remote.Repository
+		defaultBranch = remote.Branch
 	}
 
 	rootCmd.PersistentFlags().CountP("verbosity", "v", "verbosity")
