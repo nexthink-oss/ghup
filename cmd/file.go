@@ -29,7 +29,9 @@ func init() {
 	rootCmd.AddCommand(fileCmd)
 }
 
-func runFileCmd(cmd *cobra.Command, args []string) error {
+func runFileCmd(cmd *cobra.Command, args []string) (err error) {
+	defer log.WithField("path", args[0]).Trace("file").Stop(&err)
+
 	ctx := context.Background()
 
 	client, err := auth.NewTokenClient(ctx)
@@ -84,7 +86,7 @@ func runFileCmd(cmd *cobra.Command, args []string) error {
 
 	switch action {
 	case "create":
-		log.Debugf("creating '%s'", filePath)
+		log.Infof("creating github.com/%s/%s/%s", owner, repo, filePath)
 		_, _, err := client.Repositories.CreateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
 			Message: github.String(message),
 			Content: content,
@@ -94,7 +96,7 @@ func runFileCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	case "update":
-		log.Debugf("updating '%s'", filePath)
+		log.Infof("updating github.com/%s/%s/%s", owner, repo, filePath)
 		_, _, err := client.Repositories.UpdateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
 			Message: github.String(message),
 			Content: content,

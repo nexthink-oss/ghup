@@ -14,9 +14,9 @@ func NewTokenClient(ctx context.Context) (*github.Client, error) {
 	if token := viper.GetString("token"); token != "" {
 		switch token[0:4] {
 		case "ghp_":
-			log.Debug("detected Personal Access Token; commits will not be signed")
+			log.Info("detected Personal Access Token; commits will not be signed")
 		case "ghs_":
-			log.Debug("detected GitHub App-derived Token")
+			log.Info("detected GitHub App-derived Token")
 		default:
 			return nil, fmt.Errorf("invalid/unknown GitHub Token specified")
 		}

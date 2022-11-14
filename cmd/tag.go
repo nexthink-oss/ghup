@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
 	"github.com/isometry/ghup/internal/auth"
 	"github.com/spf13/cobra"
@@ -20,12 +21,12 @@ var tagCmd = &cobra.Command{
 }
 
 func init() {
-	tagCmd.Flags().StringP("message", "m", "", "message")
-
 	rootCmd.AddCommand(tagCmd)
 }
 
-func runTagCmd(cmd *cobra.Command, args []string) error {
+func runTagCmd(cmd *cobra.Command, args []string) (err error) {
+	defer log.Trace("tag").Stop(&err)
+
 	ctx := context.Background()
 
 	client, err := auth.NewTokenClient(ctx)
@@ -36,12 +37,14 @@ func runTagCmd(cmd *cobra.Command, args []string) error {
 	owner := viper.GetString("owner")
 	repo := viper.GetString("repo")
 	branch := viper.GetString("branch")
+	branchRefName := fmt.Sprintf("heads/%s", branch)
 	message := viper.GetString("message")
 
 	tagName := args[0]
 	tagRefName := fmt.Sprintf("tags/%s", tagName)
 	var tagRefObject string
 
+	log.Debugf("getting tag reference: %s", tagRefName)
 	existingTagRef, resp, err := client.Git.GetRef(ctx, owner, repo, tagRefName)
 	if err != nil && (resp == nil || (resp != nil && resp.StatusCode != http.StatusNotFound)) {
 		return err
@@ -49,7 +52,8 @@ func runTagCmd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("tag '%s' already exists: %s", tagName, *existingTagRef.Object.SHA)
 	}
 
-	branchRef, _, err := client.Git.GetRef(ctx, owner, repo, fmt.Sprintf("heads/%s", branch))
+	log.Debugf("getting branch reference: %s", branchRefName)
+	branchRef, _, err := client.Git.GetRef(ctx, owner, repo, branchRefName)
 	if err != nil {
 		return err
 	}
@@ -64,6 +68,7 @@ func runTagCmd(cmd *cobra.Command, args []string) error {
 				SHA:  github.String(branchRef.Object.GetSHA()),
 			},
 		}
+		log.Debugf("creating annotated tag")
 		annotatedTag, _, err = client.Git.CreateTag(ctx, owner, repo, annotatedTag)
 		if err != nil {
 			return err
@@ -74,18 +79,20 @@ func runTagCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	if existingTagRef != nil {
+		log.Debugf("deleting existing tag reference")
 		if _, err := client.Git.DeleteRef(ctx, owner, repo, existingTagRef.GetRef()); err != nil {
 			return err
 		}
 	}
 
 	tagRef := &github.Reference{
-		Ref: github.String(fmt.Sprintf("refs/tags/%s", tagName)),
+		Ref: &tagRefName,
 		Object: &github.GitObject{
 			SHA: github.String(tagRefObject),
 		},
 	}
 
+	log.Debugf("creating tag reference")
 	_, _, err = client.Git.CreateRef(ctx, owner, repo, tagRef)
 	if err != nil {
 		return err

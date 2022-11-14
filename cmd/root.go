@@ -6,16 +6,15 @@ import (
 	"github.com/isometry/ghup/internal/gitutil"
 
 	"github.com/apex/log"
-	"github.com/apex/log/handlers/text"
+	"github.com/apex/log/handlers/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
-	Use:               "ghup",
-	Short:             "Update GitHub content and tags via API",
-	SilenceUsage:      true,
-	PersistentPreRunE: prepareDefaults,
+	Use:          "ghup",
+	Short:        "Update GitHub content and tags via API",
+	SilenceUsage: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -27,7 +26,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initViper)
+	cobra.OnInitialize(initViper, initLogger)
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -44,11 +43,12 @@ func init() {
 		defaultBranch = githubRepo.Branch
 	}
 
-	rootCmd.PersistentFlags().Bool("debug", false, "enable debug output")
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	rootCmd.PersistentFlags().CountP("verbosity", "v", "verbosity")
+	viper.BindPFlag("verbosity", rootCmd.PersistentFlags().Lookup("verbosity"))
 
 	rootCmd.PersistentFlags().String("token", "", "GitHub Personal Access Token")
 	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
+	rootCmd.MarkFlagRequired("token")
 
 	rootCmd.PersistentFlags().StringP("owner", "o", defaultOwner, "repository owner")
 	viper.BindPFlag("owner", rootCmd.PersistentFlags().Lookup("owner"))
@@ -72,12 +72,9 @@ func initViper() {
 	viper.AutomaticEnv() // read in environment variables that match bound variables
 }
 
-func prepareDefaults(cmd *cobra.Command, args []string) (err error) {
-	log.SetHandler(text.New(os.Stderr))
+func initLogger() {
+	log.SetHandler(cli.New(os.Stderr))
 
-	if viper.GetBool("debug") {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	return nil
+	verbosity := viper.GetInt("verbosity")
+	log.SetLevel(log.Level(int(log.ErrorLevel) - verbosity))
 }
