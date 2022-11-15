@@ -13,6 +13,7 @@ import (
 )
 
 var token string
+var remote *gitutil.Remote
 var owner string
 var repo string
 var branch string
@@ -44,8 +45,8 @@ func init() {
 	var defaultRepo string
 	defaultBranch := "main"
 
-	remote := gitutil.NewRemote(cwd)
-	if remote.GitHub {
+	remote = gitutil.NewRemote(cwd)
+	if remote != nil {
 		defaultOwner = remote.Owner
 		defaultRepo = remote.Repository
 		defaultBranch = remote.Branch

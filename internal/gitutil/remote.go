@@ -9,7 +9,6 @@ import (
 
 type Remote struct {
 	Local      *git.Repository
-	GitHub     bool
 	Owner      string
 	Repository string
 	Branch     string
@@ -22,30 +21,31 @@ func NewRemote(path string) (ghr *Remote) {
 	}
 	repo, err := git.PlainOpenWithOptions(path, options)
 	if err != nil {
-		return nil
+		return
 	}
-	ghr.Local = repo
 
 	remotes, err := repo.Remotes()
 	if err != nil {
-		return nil
+		return
 	}
 
 	for _, remote := range remotes {
 		remoteConfig := *remote.Config()
 		if o, r, ok := parseRemote(remoteConfig.URLs[0]); ok {
-			ghr.GitHub = true
-			ghr.Owner = o
-			ghr.Repository = r
-			ghr.Branch = "main"
+			ghr = &Remote{
+				Local:      repo,
+				Owner:      o,
+				Repository: r,
+				Branch:     "main",
+			}
 			head, err := repo.Head()
 			if err == nil {
 				ghr.Branch = head.Name().Short()
 			}
-			return ghr
+			return
 		}
 	}
-	return nil
+	return
 }
 
 func parseRemote(remote string) (owner string, repo string, ok bool) {
