@@ -15,22 +15,21 @@ import (
 )
 
 var contentCmd = &cobra.Command{
-	Use:   "content [flags] <file-spec> ...",
+	Use:   "content [flags] [<file-spec> ...]",
 	Short: "Manage content via the GitHub V4 API",
 	Args:  cobra.ArbitraryArgs,
 	RunE:  runContentCmd,
 }
 
-var updateFiles []string
-var deleteFiles []string
-
 func init() {
 	contentCmd.Flags().StringP("separator", "s", ":", "file-spec separator")
 	viper.BindPFlag("separator", contentCmd.Flags().Lookup("separator"))
 
-	contentCmd.Flags().StringArrayVarP(&updateFiles, "update", "u", []string{}, "file-spec to update")
+	contentCmd.Flags().StringSliceP("update", "u", []string{}, "file-spec to update")
+	viper.BindPFlag("update", contentCmd.Flags().Lookup("update"))
 
-	contentCmd.Flags().StringArrayVarP(&deleteFiles, "delete", "d", []string{}, "file-path to delete")
+	contentCmd.Flags().StringSliceP("delete", "d", []string{}, "file-path to delete")
+	viper.BindPFlag("delete", contentCmd.Flags().Lookup("delete"))
 
 	rootCmd.AddCommand(contentCmd)
 }
@@ -48,7 +47,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("invalid separator")
 	}
 
-	updateFiles = append(updateFiles, args...)
+	updateFiles := append(args, viper.GetStringSlice("update")...)
+	deleteFiles := viper.GetStringSlice("delete")
 
 	additions := []githubv4.FileAddition{}
 	deletions := []githubv4.FileDeletion{}

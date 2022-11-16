@@ -91,6 +91,7 @@ func init() {
 // initViper initializes Viper to load config from the environment
 func initViper() {
 	viper.SetEnvPrefix("GITHUB")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv() // read in environment variables that match bound variables
 }
 

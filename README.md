@@ -22,7 +22,7 @@ If the current working directory is a git repository, the first GitHub remote (i
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
-All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GITHUB_[UPPERCASED_FLAG_NAME]`, e.g. `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, etc.
+All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GITHUB_[UPPERCASED_FLAG_NAME]`, e.g. `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_NO_SIGNOFF`, etc.
 
 For security, it is strongly recommended that the GitHub Token by passed via environment (`GITHUB_TOKEN`) or file path (`--token /path/to/protected-token-file`)
 
