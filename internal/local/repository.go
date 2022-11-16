@@ -1,21 +1,23 @@
-package gitutil
+package local
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	giturls "github.com/whilp/git-urls"
 )
 
-type Remote struct {
-	Local      *git.Repository
+type Repository struct {
+	Repository *git.Repository
 	Owner      string
-	Repository string
+	Name       string
 	Branch     string
+	User       string
 }
 
-func NewRemote(path string) (ghr *Remote) {
-
+func GetRepository(path string) (ghr *Repository) {
 	options := &git.PlainOpenOptions{
 		DetectDotGit: true,
 	}
@@ -32,15 +34,19 @@ func NewRemote(path string) (ghr *Remote) {
 	for _, remote := range remotes {
 		remoteConfig := *remote.Config()
 		if o, r, ok := parseRemote(remoteConfig.URLs[0]); ok {
-			ghr = &Remote{
-				Local:      repo,
+			ghr = &Repository{
+				Repository: repo,
 				Owner:      o,
-				Repository: r,
+				Name:       r,
 				Branch:     "main",
 			}
 			head, err := repo.Head()
 			if err == nil {
 				ghr.Branch = head.Name().Short()
+			}
+			config, err := repo.ConfigScoped(config.GlobalScope)
+			if err == nil {
+				ghr.User = fmt.Sprintf("%s <%s>", config.User.Name, config.User.Email)
 			}
 			return
 		}

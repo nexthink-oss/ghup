@@ -1,1 +1,119 @@
-# ghup - GitHub API client for automated content and tag management
+# ghup
+
+A GitHub API client for managing tags and repository content from third-party automation systems (e.g. Jenkins).
+
+## Features
+
+* Create and update tags, both lightweight and annotated.
+* Add, update and delete content
+* GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
+* Repository and author defaults inferred from local context (e.g. git clone).
+* Completely self-contained: no external dependencies.
+
+## Requirements
+
+* A GitHub Token, preferably derived from GitHub App credentials, with `contents=write` and `metadata=read` permissions on target repository.
+
+Note: works well with [vault-plugin-secrets-github](https://github.com/martinbaillie/vault-plugin-secrets-github)!
+
+## Configuration
+
+If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default user for generated `Signed-off-by` message suffix (`--user`).
+
+If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
+
+All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GITHUB_[UPPERCASED_FLAG_NAME]`, e.g. `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, etc.
+
+For security, it is strongly recommended that the GitHub Token by passed via environment (`GITHUB_TOKEN`) or file path (`--token /path/to/protected-token-file`)
+
+## Usage
+
+### Tagging
+
+```console
+$ ghup tag --help
+
+Manage tags via the GitHub V3 API
+
+Usage:
+  ghup tag [flags] <tagname>
+
+Flags:
+  -h, --help   help for tag
+
+Global Flags:
+  -b, --branch string     branch name (default "[local-branch-or-main]")
+  -f, --force             force action
+  -m, --message string    message
+      --no-signoff        don't add Signed-off-by to message
+  -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string      GitHub Token (default: GITHUB_TOKEN)
+      --user string       user details for sign-off (default "[user.name] <[user.email]>")
+  -v, --verbosity count   verbosity
+```
+
+Note: only lightweight tags (no message and `--no-signoff`), which simply point at an existing commit, are "verified".
+
+#### Tagging Example
+
+Tag the current repo with `v1.0`:
+
+```console
+$ ghup tag v1.0 -m "Release v1.0!"
+https://github.com/isometry/ghup/releases/tag/v1.0
+```
+
+### Content
+
+```console
+$ ghup content --help
+
+Manage content via the GitHub V4 API
+
+Usage:
+  ghup content [flags] <file-spec> ...
+
+Flags:
+  -d, --delete stringArray   file-path to delete
+  -h, --help                 help for update
+  -s, --separator string     separator (default ":")
+  -u, --update stringArray   file-spec to update
+
+Global Flags:
+  -b, --branch string     branch name (default "[local-branch-or-main]")
+  -f, --force             force action
+  -m, --message string    message
+      --no-signoff        don't add Signed-off-by to message
+  -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string      GitHub Token (default: GITHUB_TOKEN)
+      --user string       user details for sign-off (default "[user.name] <[user.email]>")
+  -v, --verbosity count   verbosity
+```
+
+Each `file-spec` provided as a positional argument or explicitly via the `--update` flag takes the form `<local-file-path>[:<remote-target-path>]`. Content is read from the local file `<local-file-path>` and written to `<remote-target-path>` (defaulting to `<local-file-path>` if not specified).
+
+Each `file-path` provided to the `--delete` flag is a `<remote-target-path>`: the path to a file on the target repository:branch that should be deleted.
+
+Unless `--force` is used, content that already matches the remote repository state is ignored.
+
+#### Content Example
+
+Update `.zshrc` in my `dotfiles` repo, adding if 's missing and updating if-and-only-if changed:
+
+```console
+$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "Update zshrc"
+https://github.com/isometry/dotfiles/commit/15b8630c81a051c2b128c94e5796c5d9c2bc8846
+$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "Update zshrc"
+nothing to do
+```
+
+Delete `.tcshrc` from my `dotfiles` repo:
+
+```console
+$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "Remove tcshrc"
+https://github.com/isometry/dotfiles/commit/bf120a96c65cb482eacc3c9e27d2d0935d108eca
+$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "Remove tcshrc"
+nothing to do
+```

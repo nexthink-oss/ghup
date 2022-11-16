@@ -9,14 +9,14 @@ import (
 
 	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
-	"github.com/isometry/ghup/internal/auth"
+	"github.com/isometry/ghup/internal/remote"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var fileCmd = &cobra.Command{
 	Use:        "file [flags] <path>",
-	Short:      "create/update file",
+	Short:      "Manage a single file's contents via the GitHub V3 API (deprecated, use update instead)",
 	Args:       cobra.ExactArgs(1),
 	ArgAliases: []string{"path"},
 	RunE:       runFileCmd,
@@ -34,7 +34,7 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 
 	ctx := context.Background()
 
-	client, err := auth.NewTokenClient(ctx)
+	client, err := remote.NewTokenClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	branchRef, _, err := client.Git.GetRef(ctx, owner, repo, fmt.Sprintf("heads/%s", branch))
+	branchRef, _, err := client.V3.Git.GetRef(ctx, owner, repo, fmt.Sprintf("heads/%s", branch))
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	action := "update"
-	existingContent, _, resp, err := client.Repositories.GetContents(ctx, owner, repo, filePath, &github.RepositoryContentGetOptions{Ref: branchRef.GetRef()})
+	existingContent, _, resp, err := client.V3.Repositories.GetContents(ctx, owner, repo, filePath, &github.RepositoryContentGetOptions{Ref: branchRef.GetRef()})
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			action = "create"
@@ -82,7 +82,7 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 	switch action {
 	case "create":
 		log.Infof("creating github.com/%s/%s/%s", owner, repo, filePath)
-		_, _, err := client.Repositories.CreateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
+		_, _, err := client.V3.Repositories.CreateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
 			Message: github.String(message),
 			Content: content,
 			Branch:  github.String(branch),
@@ -92,7 +92,7 @@ func runFileCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 	case "update":
 		log.Infof("updating github.com/%s/%s/%s", owner, repo, filePath)
-		_, _, err := client.Repositories.UpdateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
+		_, _, err := client.V3.Repositories.UpdateFile(ctx, owner, repo, filePath, &github.RepositoryContentFileOptions{
 			Message: github.String(message),
 			Content: content,
 			SHA:     github.String(existingContent.GetSHA()),
