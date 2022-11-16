@@ -36,7 +36,7 @@ $ ghup tag --help
 Manage tags via the GitHub V3 API
 
 Usage:
-  ghup tag [flags] <tagname>
+  ghup tag [flags] <name>
 
 Flags:
   -h, --help   help for tag

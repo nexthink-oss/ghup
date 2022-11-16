@@ -13,10 +13,10 @@ import (
 )
 
 var tagCmd = &cobra.Command{
-	Use:        "tag [flags] <tagname>",
+	Use:        "tag [flags] <name>",
 	Short:      "Manage tags via the GitHub V3 API",
 	Args:       cobra.ExactArgs(1),
-	ArgAliases: []string{"tagname"},
+	ArgAliases: []string{"name"},
 	RunE:       runTagCmd,
 }
 
