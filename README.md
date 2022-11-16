@@ -18,7 +18,7 @@ Note: works well with [vault-plugin-secrets-github](https://github.com/martinbai
 
 ## Configuration
 
-If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default user for generated `Signed-off-by` message suffix (`--user`).
+If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Signed-off-by` message suffix (`--author`) to help distinguish between different systems sharing common GitHub App credentials.
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
@@ -42,6 +42,7 @@ Flags:
   -h, --help   help for tag
 
 Global Flags:
+      --author string     user details for sign-off (default "[user.name] <[user.email]>")
   -b, --branch string     branch name (default "[local-branch-or-main]")
   -f, --force             force action
   -m, --message string    message
@@ -49,7 +50,6 @@ Global Flags:
   -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
   -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
       --token string      GitHub Token (default: GITHUB_TOKEN)
-      --user string       user details for sign-off (default "[user.name] <[user.email]>")
   -v, --verbosity count   verbosity
 ```
 
@@ -81,6 +81,7 @@ Flags:
   -u, --update stringArray   file-spec to update
 
 Global Flags:
+      --author string     user details for sign-off (default "[user.name] <[user.email]>")
   -b, --branch string     branch name (default "[local-branch-or-main]")
   -f, --force             force action
   -m, --message string    message
@@ -88,7 +89,6 @@ Global Flags:
   -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
   -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
       --token string      GitHub Token (default: GITHUB_TOKEN)
-      --user string       user details for sign-off (default "[user.name] <[user.email]>")
   -v, --verbosity count   verbosity
 ```
 
