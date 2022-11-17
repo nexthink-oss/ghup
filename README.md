@@ -36,10 +36,11 @@ $ ghup tag --help
 Manage tags via the GitHub V3 API
 
 Usage:
-  ghup tag [flags] <name>
+  ghup tag [flags] [<name>]
 
 Flags:
-  -h, --help   help for tag
+  -h, --help         help for tag
+      --tag string   tag name
 
 Global Flags:
       --author string     user details for sign-off (default "[user.name] <[user.email]>")
@@ -72,7 +73,7 @@ $ ghup content --help
 Manage content via the GitHub V4 API
 
 Usage:
-  ghup content [flags] <file-spec> ...
+  ghup content [flags] [<file-spec> ...]
 
 Flags:
   -d, --delete stringArray   file-path to delete
