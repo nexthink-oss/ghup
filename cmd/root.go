@@ -114,17 +114,17 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 	owner = viper.GetString("owner")
 	if owner == "" {
-		return fmt.Errorf("invalid owner: '%+v'", owner)
+		return fmt.Errorf("no owner specified")
 	}
 
 	repo = viper.GetString("repo")
 	if repo == "" {
-		return fmt.Errorf("invalid repo: '%+v'", repo)
+		return fmt.Errorf("no repo specified")
 	}
 
 	branch = viper.GetString("branch")
 	if branch == "" {
-		return fmt.Errorf("invalid branch: '%+v'", branch)
+		return fmt.Errorf("no branch specified")
 	}
 
 	messageParts := []string{}
