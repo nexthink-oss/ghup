@@ -1,4 +1,4 @@
-module github.com/isometry/ghup
+module github.com/nexthink-oss/ghup
 
 go 1.19
 

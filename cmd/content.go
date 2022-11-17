@@ -7,8 +7,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/isometry/ghup/internal/local"
-	"github.com/isometry/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/local"
+	"github.com/nexthink-oss/ghup/internal/remote"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

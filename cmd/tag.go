@@ -7,7 +7,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
-	"github.com/isometry/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/remote"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

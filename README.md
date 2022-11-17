@@ -62,7 +62,7 @@ Tag the current repo with `v1.0`:
 
 ```console
 $ ghup tag v1.0 -m "Release v1.0!"
-https://github.com/isometry/ghup/releases/tag/v1.0
+https://github.com/nexthink-oss/ghup/releases/tag/v1.0
 ```
 
 ### Content

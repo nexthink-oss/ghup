@@ -1,6 +1,6 @@
 package main
 
-import "github.com/isometry/ghup/cmd"
+import "github.com/nexthink-oss/ghup/cmd"
 
 func main() {
 	cmd.Execute()

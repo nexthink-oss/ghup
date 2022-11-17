@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/isometry/ghup/internal/local"
-	"github.com/isometry/ghup/internal/util"
+	"github.com/nexthink-oss/ghup/internal/local"
+	"github.com/nexthink-oss/ghup/internal/util"
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
