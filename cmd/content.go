@@ -37,7 +37,7 @@ func init() {
 func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	ctx := context.Background()
 
-	client, err := remote.NewTokenClient(ctx)
+	client, err := remote.NewTokenClient(ctx, token)
 	if err != nil {
 		return err
 	}

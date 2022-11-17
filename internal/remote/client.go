@@ -9,7 +9,6 @@ import (
 	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
 	"github.com/shurcooL/githubv4"
-	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 )
 
@@ -19,8 +18,8 @@ type TokenClient struct {
 	V4      *githubv4.Client
 }
 
-func NewTokenClient(ctx context.Context) (client *TokenClient, err error) {
-	token, err := ResolveToken()
+func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err error) {
+	token, err = ResolveToken(token)
 	if err != nil {
 		return
 	}
@@ -40,15 +39,15 @@ func NewTokenClient(ctx context.Context) (client *TokenClient, err error) {
 	return client, nil
 }
 
-func ResolveToken() (token string, err error) {
-	token = viper.GetString("token")
+func ResolveToken(tokenVar string) (token string, err error) {
+	token = tokenVar
 
 	if _, err := os.Stat(token); err == nil {
-		token_bytes, err := os.ReadFile(token)
+		tokenBytes, err := os.ReadFile(token)
 		if err != nil {
 			return "", err
 		}
-		token = strings.TrimSpace(string(token_bytes))
+		token = strings.TrimSpace(string(tokenBytes))
 	}
 
 	if token == "" {

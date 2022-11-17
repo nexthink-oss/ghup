@@ -22,9 +22,9 @@ If the current working directory is a git repository, the first GitHub remote (i
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
-All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GITHUB_[UPPERCASED_FLAG_NAME]`, e.g. `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_BRANCH`, `GITHUB_NO_SIGNOFF`, etc.
+All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_NO_SIGNOFF`, etc.
 
-For security, it is strongly recommended that the GitHub Token by passed via environment (`GITHUB_TOKEN`) or file path (`--token /path/to/protected-token-file`)
+For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/protected-token-file`)
 
 ## Usage
 
@@ -49,7 +49,7 @@ Global Flags:
       --no-signoff        don't add Signed-off-by to message
   -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
   -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string      GitHub Token (default: GITHUB_TOKEN)
+      --token string      GitHub Token or path/to/token-file
   -v, --verbosity count   verbosity
 ```
 
@@ -88,7 +88,7 @@ Global Flags:
       --no-signoff        don't add Signed-off-by to message
   -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
   -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string      GitHub Token (default: GITHUB_TOKEN)
+      --token string      GitHub Token or path/to/token-file
   -v, --verbosity count   verbosity
 ```
 

@@ -90,9 +90,11 @@ func init() {
 
 // initViper initializes Viper to load config from the environment
 func initViper() {
-	viper.SetEnvPrefix("GITHUB")
+	viper.SetEnvPrefix("GHUP")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv() // read in environment variables that match bound variables
+	viper.BindEnv("token", "GHUP_TOKEN", "GITHUB_TOKEN")
+	viper.BindEnv("owner", "GHUP_OWNER", "GITHUB_OWNER")
 }
 
 // initLogger initializes the logger subsystem
@@ -107,7 +109,7 @@ func initLogger() {
 func validateFlags(cmd *cobra.Command, args []string) error {
 	token = viper.GetString("token")
 	if token == "" {
-		return fmt.Errorf("invalid token: '%+v'", token)
+		return fmt.Errorf("no GitHub token found")
 	}
 
 	owner = viper.GetString("owner")
