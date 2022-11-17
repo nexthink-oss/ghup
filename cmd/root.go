@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/isometry/ghup/internal/local"
+	"github.com/isometry/ghup/internal/util"
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
@@ -14,7 +15,11 @@ import (
 )
 
 var (
-	localRepo *local.Repository
+	localRepo   *local.Repository
+	localOwner  string
+	localName   string
+	localBranch string = "main"
+
 	token     string
 	owner     string
 	repo      string
@@ -47,9 +52,6 @@ func init() {
 	if err != nil {
 		os.Exit(99)
 	}
-	var localOwner string
-	var localName string
-	localBranch := "main"
 
 	localRepo = local.GetRepository(cwd)
 	if localRepo != nil {
@@ -109,20 +111,20 @@ func initLogger() {
 func validateFlags(cmd *cobra.Command, args []string) error {
 	token = viper.GetString("token")
 	if token == "" {
-		return fmt.Errorf("no GitHub token found")
+		return fmt.Errorf("no token specified")
 	}
 
-	owner = viper.GetString("owner")
+	owner = util.Coalesce(viper.GetString("owner"), localOwner)
 	if owner == "" {
 		return fmt.Errorf("no owner specified")
 	}
 
-	repo = viper.GetString("repo")
+	repo = util.Coalesce(viper.GetString("repo"), localName)
 	if repo == "" {
 		return fmt.Errorf("no repo specified")
 	}
 
-	branch = viper.GetString("branch")
+	branch = util.Coalesce(viper.GetString("branch"), localBranch)
 	if branch == "" {
 		return fmt.Errorf("no branch specified")
 	}
