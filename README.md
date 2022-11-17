@@ -1,3 +1,6 @@
+[![CodeQL](https://github.com/nexthink-oss/ghup/actions/workflows/codeql.yml/badge.svg)](https://github.com/nexthink-oss/ghup/actions/workflows/codeql.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nexthink-oss/ghup)](https://goreportcard.com/report/github.com/nexthink-oss/ghup)
+
 # ghup
 
 A GitHub API client for managing tags and repository content from third-party automation systems (e.g. Jenkins).
