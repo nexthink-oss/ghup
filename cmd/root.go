@@ -31,10 +31,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:               "ghup",
-	Short:             "Update GitHub content and tags via API",
-	SilenceUsage:      true,
-	PersistentPreRunE: validateFlags,
+	Use:          "ghup",
+	Short:        "Update GitHub content and tags via API",
+	SilenceUsage: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

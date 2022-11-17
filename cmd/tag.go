@@ -18,7 +18,7 @@ var tagCmd = &cobra.Command{
 	Use:     "tag [flags] [<name>]",
 	Short:   "Manage tags via the GitHub V3 API",
 	Args:    cobra.MaximumNArgs(1),
-	PreRunE: validateTagName,
+	PreRunE: validateFlags,
 	RunE:    runTagCmd,
 }
 
@@ -35,6 +35,16 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	client, err := remote.NewTokenClient(ctx, token)
 	if err != nil {
 		return err
+	}
+
+	tagName = viper.GetString("tag")
+
+	if len(args) == 1 {
+		tagName = args[0]
+	}
+
+	if tagName == "" {
+		return fmt.Errorf("no tag specified")
 	}
 
 	branchRefName := fmt.Sprintf("heads/%s", branch)
@@ -97,19 +107,5 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	fmt.Printf("https://github.com/%s/%s/releases/tag/%s\n", owner, repo, tagName)
-	return
-}
-
-func validateTagName(cmd *cobra.Command, args []string) (err error) {
-	tagName = viper.GetString("tag")
-
-	if len(args) == 1 {
-		tagName = args[0]
-	}
-
-	if tagName == "" {
-		return fmt.Errorf("no tag specified")
-	}
-
 	return
 }

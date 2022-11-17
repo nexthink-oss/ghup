@@ -15,10 +15,11 @@ import (
 )
 
 var contentCmd = &cobra.Command{
-	Use:   "content [flags] [<file-spec> ...]",
-	Short: "Manage content via the GitHub V4 API",
-	Args:  cobra.ArbitraryArgs,
-	RunE:  runContentCmd,
+	Use:     "content [flags] [<file-spec> ...]",
+	Short:   "Manage content via the GitHub V4 API",
+	Args:    cobra.ArbitraryArgs,
+	PreRunE: validateFlags,
+	RunE:    runContentCmd,
 }
 
 func init() {
