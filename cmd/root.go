@@ -19,17 +19,16 @@ var (
 	buildCommit  string = "unknown"
 	buildDate    string = "unknown"
 
-	localRepo   *local.Repository
-	localOwner  string
-	localName   string
-	localBranch string = "main"
+	localRepo     *local.Repository
+	defaultAuthor string
+	defaultOwner  string
+	defaultRepo   string
+	defaultBranch string = "main"
 
-	token     string
 	owner     string
 	repo      string
 	branch    string
 	message   string
-	author    string
 	noSignOff bool
 	force     bool
 )
@@ -59,10 +58,10 @@ func init() {
 
 	localRepo = local.GetRepository(cwd)
 	if localRepo != nil {
-		localOwner = localRepo.Owner
-		localName = localRepo.Name
-		localBranch = localRepo.Branch
-		author = localRepo.User
+		defaultAuthor = localRepo.User
+		defaultOwner = localRepo.Owner
+		defaultRepo = localRepo.Name
+		defaultBranch = localRepo.Branch
 	}
 
 	rootCmd.PersistentFlags().CountP("verbosity", "v", "verbosity")
@@ -70,15 +69,14 @@ func init() {
 
 	rootCmd.PersistentFlags().String("token", "", "GitHub Token or path/to/token-file")
 	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
-	rootCmd.MarkFlagRequired("token")
 
-	rootCmd.PersistentFlags().StringP("owner", "o", localOwner, "repository owner")
+	rootCmd.PersistentFlags().StringP("owner", "o", defaultOwner, "repository owner")
 	viper.BindPFlag("owner", rootCmd.PersistentFlags().Lookup("owner"))
 
-	rootCmd.PersistentFlags().StringP("repo", "r", localName, "repository name")
+	rootCmd.PersistentFlags().StringP("repo", "r", defaultRepo, "repository name")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
 
-	rootCmd.PersistentFlags().StringP("branch", "b", localBranch, "branch name")
+	rootCmd.PersistentFlags().StringP("branch", "b", defaultBranch, "branch name")
 	viper.BindPFlag("branch", rootCmd.PersistentFlags().Lookup("branch"))
 
 	rootCmd.PersistentFlags().StringP("message", "m", "", "message")
@@ -87,7 +85,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noSignOff, "no-signoff", false, "don't add Signed-off-by to message")
 	viper.BindPFlag("no_signoff", rootCmd.PersistentFlags().Lookup("no-signoff"))
 
-	rootCmd.PersistentFlags().StringVar(&author, "author", author, "user details for sign-off")
+	rootCmd.PersistentFlags().String("author", defaultAuthor, "user details for sign-off")
 	viper.BindPFlag("author", rootCmd.PersistentFlags().Lookup("author"))
 
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force action")
@@ -113,34 +111,20 @@ func initLogger() {
 
 // validateFlags checks mandatory flags are valid and stores results in shared variables
 func validateFlags(cmd *cobra.Command, args []string) error {
-	token = viper.GetString("token")
-	if token == "" {
-		return fmt.Errorf("no token specified")
-	}
-
-	owner = util.Coalesce(viper.GetString("owner"), localOwner)
+	owner = util.Coalesce(viper.GetString("owner"), defaultOwner)
 	if owner == "" {
 		return fmt.Errorf("no owner specified")
 	}
 
-	repo = util.Coalesce(viper.GetString("repo"), localName)
+	repo = util.Coalesce(viper.GetString("repo"), defaultRepo)
 	if repo == "" {
 		return fmt.Errorf("no repo specified")
 	}
 
-	branch = util.Coalesce(viper.GetString("branch"), localBranch)
+	branch = util.Coalesce(viper.GetString("branch"), defaultBranch)
 	if branch == "" {
 		return fmt.Errorf("no branch specified")
 	}
-
-	messageParts := []string{}
-	if message := viper.GetString("message"); message != "" {
-		messageParts = append(messageParts, message)
-	}
-	if author := viper.GetString("author"); author != "" && !noSignOff {
-		messageParts = append(messageParts, fmt.Sprintf("Signed-off-by: %s", author))
-	}
-	message = strings.Join(messageParts, "\n")
 
 	return nil
 }

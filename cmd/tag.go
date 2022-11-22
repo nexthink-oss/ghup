@@ -8,6 +8,7 @@ import (
 	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
 	"github.com/nexthink-oss/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -32,7 +33,7 @@ func init() {
 func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	ctx := context.Background()
 
-	client, err := remote.NewTokenClient(ctx, token)
+	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
 	if err != nil {
 		return err
 	}
@@ -65,6 +66,8 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	message = util.BuildCommitMessage(!noSignOff)
 
 	if message != "" {
 		annotatedTag := &github.Tag{
