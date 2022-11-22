@@ -8,7 +8,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+      - "-s -w -X github.com/nexthink-oss/ghup/cmd.buildVersion={{.Version}} -X github.com/nexthink-oss/ghup/cmd.buildCommit={{.ShortCommit}} -X github.com/nexthink-oss/ghup/cmd.buildDate={{.Date}}"
     goos:
       - freebsd
       - windows

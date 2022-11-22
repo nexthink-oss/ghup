@@ -15,6 +15,10 @@ import (
 )
 
 var (
+	buildVersion string = "snapshot"
+	buildCommit  string = "unknown"
+	buildDate    string = "unknown"
+
 	localRepo   *local.Repository
 	localOwner  string
 	localName   string
@@ -34,6 +38,7 @@ var rootCmd = &cobra.Command{
 	Use:          "ghup",
 	Short:        "Update GitHub content and tags via API",
 	SilenceUsage: true,
+	Version:      fmt.Sprintf("%s-%s (built %s)", buildVersion, buildCommit, buildDate),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
