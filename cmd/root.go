@@ -26,12 +26,11 @@ var (
 	defaultRepo      string
 	defaultBranch    string = "main"
 
-	owner     string
-	repo      string
-	branch    string
-	message   string
-	noSignOff bool
-	force     bool
+	owner   string
+	repo    string
+	branch  string
+	message string
+	force   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -84,19 +83,19 @@ func init() {
 	viper.BindPFlag("branch", rootCmd.PersistentFlags().Lookup("branch"))
 	viper.BindEnv("branch", "GHUP_BRANCH", "CHANGE_BRANCH", "BRANCH_NAME", "GIT_BRANCH")
 
-	rootCmd.PersistentFlags().StringP("message", "m", "", "message")
+	rootCmd.PersistentFlags().StringP("message", "m", "Commit via API", "message")
 	viper.BindPFlag("message", rootCmd.PersistentFlags().Lookup("message"))
 
-	rootCmd.PersistentFlags().BoolVar(&noSignOff, "no-signoff", false, "don't add Signed-off-by to message")
-	viper.BindPFlag("no_signoff", rootCmd.PersistentFlags().Lookup("no-signoff"))
+	rootCmd.PersistentFlags().String("trailer.key", "Co-Authored-By", "key for commit trailer (blank to disable)")
+	viper.BindPFlag("trailer.key", rootCmd.PersistentFlags().Lookup("trailer.key"))
 
-	rootCmd.PersistentFlags().String("user.name", defaultUserName, "user name for sign-off")
-	viper.BindPFlag("user.name", rootCmd.PersistentFlags().Lookup("user.name"))
-	viper.BindEnv("user.name", "GHUP_USER_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME")
+	rootCmd.PersistentFlags().String("trailer.name", defaultUserName, "name for commit trailer")
+	viper.BindPFlag("trailer.name", rootCmd.PersistentFlags().Lookup("trailer.name"))
+	viper.BindEnv("trailer.name", "GHUP_USER_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME")
 
-	rootCmd.PersistentFlags().String("user.email", defaultUserEmail, "user email for sign-off")
-	viper.BindPFlag("user.email", rootCmd.PersistentFlags().Lookup("user.email"))
-	viper.BindEnv("user.email", "GHUP_USER_EMAIL", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL")
+	rootCmd.PersistentFlags().String("trailer.email", defaultUserEmail, "email for commit trailer")
+	viper.BindPFlag("trailer.email", rootCmd.PersistentFlags().Lookup("trailer.email"))
+	viper.BindEnv("trailer.email", "GHUP_USER_EMAIL", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL")
 
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force action")
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))

@@ -101,7 +101,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	message = util.BuildCommitMessage(!noSignOff)
+	message = util.BuildCommitMessage()
 
 	input := githubv4.CreateCommitOnBranchInput{
 		Branch:          remote.CommittableBranch(owner, repo, branch),
