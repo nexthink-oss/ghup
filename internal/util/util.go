@@ -22,9 +22,25 @@ func BuildCommitMessage(withSignoff bool) (message string) {
 	if message := viper.GetString("message"); message != "" {
 		messageParts = append(messageParts, message)
 	}
-	if author := viper.GetString("author"); author != "" && withSignoff {
-		messageParts = append(messageParts, fmt.Sprintf("Signed-off-by: %s", author))
+	if withSignoff {
+		if committer := BuildCommitter(); committer != "" {
+			messageParts = append(messageParts, fmt.Sprintf("Signed-off-by: %s", committer))
+		}
 	}
 	message = strings.Join(messageParts, "\n")
+	return
+}
+
+func BuildCommitter() (committer string) {
+	var userParts []string
+	if userName := viper.GetString("user.name"); userName != "" {
+		userParts = append(userParts, userName)
+	}
+	if userEmail := viper.GetString("user.email"); userEmail != "" {
+		userParts = append(userParts, fmt.Sprintf("<%s>", userEmail))
+	}
+	if len(userParts) > 0 {
+		committer = strings.Join(userParts, " ")
+	}
 	return
 }

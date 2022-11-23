@@ -1,7 +1,6 @@
 package local
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -14,7 +13,8 @@ type Repository struct {
 	Owner      string
 	Name       string
 	Branch     string
-	User       string
+	UserName   string
+	UserEmail  string
 }
 
 func GetRepository(path string) (ghr *Repository) {
@@ -46,7 +46,8 @@ func GetRepository(path string) (ghr *Repository) {
 			}
 			config, err := repo.ConfigScoped(config.GlobalScope)
 			if err == nil {
-				ghr.User = fmt.Sprintf("%s <%s>", config.User.Name, config.User.Email)
+				ghr.UserName = config.User.Name
+				ghr.UserEmail = config.User.Email
 			}
 			return
 		}

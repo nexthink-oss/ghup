@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nexthink-oss/ghup/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
@@ -10,7 +11,7 @@ import (
 
 type info struct {
 	HasToken   bool `yaml:"hasToken"`
-	Author     string
+	Committer  string
 	Owner      string
 	Repository string
 	Branch     string
@@ -33,7 +34,7 @@ func init() {
 func runInfoCmd(cmd *cobra.Command, args []string) (err error) {
 	i := info{
 		HasToken:   len(viper.GetString("token")) > 0,
-		Author:     viper.GetString("author"),
+		Committer:  util.BuildCommitter(),
 		Owner:      owner,
 		Repository: repo,
 		Branch:     branch,

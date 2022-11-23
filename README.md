@@ -8,9 +8,9 @@ A GitHub API client for managing tags and repository content from third-party au
 ## Features
 
 * Create and update tags, both lightweight and annotated.
-* Add, update and delete content
+* Add, update and delete content idempotently.
 * GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
-* Repository and author defaults inferred from local context (e.g. git clone).
+* Configuration defaults inferred from local context (e.g. git clone and environment).
 * Completely self-contained: no external dependencies.
 
 ## Requirements
@@ -21,11 +21,13 @@ Note: works well with [vault-plugin-secrets-github](https://github.com/martinbai
 
 ## Configuration
 
-If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Signed-off-by` message suffix (`--author`) to help distinguish between different systems sharing common GitHub App credentials.
+If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Signed-off-by` message suffix (`--user.name` and `--user.email`) to help distinguish between different systems sharing common GitHub App credentials.
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
 All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_NO_SIGNOFF`, etc.
+
+In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_OWNER`, `GITHUB_TOKEN`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
 
 For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/protected-token-file`)
 
@@ -46,15 +48,16 @@ Flags:
       --tag string   tag name
 
 Global Flags:
-      --author string     user details for sign-off (default "[user.name] <[user.email]>")
-  -b, --branch string     branch name (default "[local-branch-or-main]")
-  -f, --force             force action
-  -m, --message string    message
-      --no-signoff        don't add Signed-off-by to message
-  -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string      GitHub Token or path/to/token-file
-  -v, --verbosity count   verbosity
+  -b, --branch string       branch name (default "[local-branch-or-main]")
+  -f, --force               force action
+  -m, --message string      message
+      --no-signoff          don't add Signed-off-by to message
+  -o, --owner string        repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string         repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string        GitHub Token or path/to/token-file
+      --user.email string   user email for sign-off (default "[user.email]")
+      --user.name string    user name for sign-off (default "[user.name]")
+  -v, --verbosity count     verbosity
 ```
 
 Note: only lightweight tags (no message and `--no-signoff`), which simply point at an existing commit, are "verified".
@@ -85,15 +88,16 @@ Flags:
   -u, --update stringArray   file-spec to update
 
 Global Flags:
-      --author string     user details for sign-off (default "[user.name] <[user.email]>")
-  -b, --branch string     branch name (default "[local-branch-or-main]")
-  -f, --force             force action
-  -m, --message string    message
-      --no-signoff        don't add Signed-off-by to message
-  -o, --owner string      repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string       repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string      GitHub Token or path/to/token-file
-  -v, --verbosity count   verbosity
+  -b, --branch string       branch name (default "[local-branch-or-main]")
+  -f, --force               force action
+  -m, --message string      message
+      --no-signoff          don't add Signed-off-by to message
+  -o, --owner string        repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string         repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string        GitHub Token or path/to/token-file
+      --user.email string   user email for sign-off (default "[user.email]")
+      --user.name string    user name for sign-off (default "[user.name]")
+  -v, --verbosity count     verbosity
 ```
 
 Each `file-spec` provided as a positional argument or explicitly via the `--update` flag takes the form `<local-file-path>[:<remote-target-path>]`. Content is read from the local file `<local-file-path>` and written to `<remote-target-path>` (defaulting to `<local-file-path>` if not specified).
