@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/nexthink-oss/ghup/internal/local"
 	"github.com/nexthink-oss/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/util"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -38,7 +39,7 @@ func init() {
 func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	ctx := context.Background()
 
-	client, err := remote.NewTokenClient(ctx, token)
+	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
 	if err != nil {
 		return err
 	}
@@ -99,6 +100,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	message = util.BuildCommitMessage(!noSignOff)
 
 	input := githubv4.CreateCommitOnBranchInput{
 		Branch:          remote.CommittableBranch(owner, repo, branch),

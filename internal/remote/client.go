@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/google/go-github/v48/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
@@ -52,17 +51,6 @@ func ResolveToken(tokenVar string) (token string, err error) {
 
 	if token == "" {
 		return "", fmt.Errorf("no GitHub Token found")
-	}
-
-	switch {
-	case token[0:4] == "ghp_":
-		log.Debug("found legacy Personal Access Token")
-	case token[0:11] == "github_pat_":
-		log.Debug("found fine-grained Personal Access Token")
-	case token[0:4] == "ghs_":
-		log.Debug("found GitHub App-derived Token")
-	default:
-		err = fmt.Errorf("invalid/unknown GitHub Token specified")
 	}
 
 	return

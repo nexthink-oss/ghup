@@ -1,7 +1,6 @@
 package local
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -14,7 +13,8 @@ type Repository struct {
 	Owner      string
 	Name       string
 	Branch     string
-	User       string
+	UserName   string
+	UserEmail  string
 }
 
 func GetRepository(path string) (ghr *Repository) {
@@ -46,12 +46,29 @@ func GetRepository(path string) (ghr *Repository) {
 			}
 			config, err := repo.ConfigScoped(config.GlobalScope)
 			if err == nil {
-				ghr.User = fmt.Sprintf("%s <%s>", config.User.Name, config.User.Email)
+				ghr.UserName = config.User.Name
+				ghr.UserEmail = config.User.Email
 			}
 			return
 		}
 	}
 	return
+}
+
+func (r *Repository) HeadCommit() (hash string) {
+	head, err := r.Repository.Head()
+	if err == nil {
+		hash = head.Hash().String()
+	}
+	return
+}
+
+func (r *Repository) Status() (status git.Status, err error) {
+	worktree, err := r.Repository.Worktree()
+	if err != nil {
+		return nil, err
+	}
+	return worktree.Status()
 }
 
 func parseRemote(remote string) (owner string, repo string, ok bool) {
