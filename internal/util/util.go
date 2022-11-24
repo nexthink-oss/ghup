@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/spf13/viper"
 )
 
@@ -17,30 +18,33 @@ func Coalesce(values ...string) (value string) {
 	return
 }
 
-func BuildCommitMessage(withSignoff bool) (message string) {
+func BuildCommitMessage() (message string) {
 	messageParts := []string{}
 	if message := viper.GetString("message"); message != "" {
+		if strings.Index(message, "\n") > 72 {
+			log.Warn("commit message title exceeds 72 characters and will be wrapped by GitHub")
+		}
 		messageParts = append(messageParts, message)
 	}
-	if withSignoff {
-		if committer := BuildCommitter(); committer != "" {
-			messageParts = append(messageParts, fmt.Sprintf("Signed-off-by: %s", committer))
-		}
+	if trailer := BuildTrailer(); trailer != "" {
+		messageParts = append(messageParts, "", trailer)
 	}
 	message = strings.Join(messageParts, "\n")
 	return
 }
 
-func BuildCommitter() (committer string) {
-	var userParts []string
-	if userName := viper.GetString("user.name"); userName != "" {
-		userParts = append(userParts, userName)
-	}
-	if userEmail := viper.GetString("user.email"); userEmail != "" {
-		userParts = append(userParts, fmt.Sprintf("<%s>", userEmail))
-	}
-	if len(userParts) > 0 {
-		committer = strings.Join(userParts, " ")
+func BuildTrailer() (trailer string) {
+	if trailerKey := viper.GetString("trailer.key"); trailerKey != "" {
+		var userParts []string
+		if userName := viper.GetString("trailer.name"); userName != "" {
+			userParts = append(userParts, userName)
+		}
+		if userEmail := viper.GetString("trailer.email"); userEmail != "" {
+			userParts = append(userParts, fmt.Sprintf("<%s>", userEmail))
+		}
+		if len(userParts) > 0 {
+			trailer = fmt.Sprintf("%s: %s", trailerKey, strings.Join(userParts, " "))
+		}
 	}
 	return
 }

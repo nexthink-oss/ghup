@@ -27,6 +27,9 @@ func init() {
 	tagCmd.Flags().String("tag", "", "tag name")
 	viper.BindPFlag("tag", tagCmd.Flags().Lookup("tag"))
 
+	tagCmd.Flags().Bool("lightweight", false, "force lightweight tag")
+	viper.BindPFlag("lightweight", tagCmd.Flags().Lookup("lightweight"))
+
 	rootCmd.AddCommand(tagCmd)
 }
 
@@ -67,9 +70,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	message = util.BuildCommitMessage(!noSignOff)
-
-	if message != "" {
+	if message = util.BuildCommitMessage(); message != "" && !viper.GetBool("lightweight") {
 		annotatedTag := &github.Tag{
 			Tag:     &tagName,
 			Message: &message,
