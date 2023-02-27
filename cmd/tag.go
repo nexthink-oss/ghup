@@ -6,11 +6,12 @@ import (
 	"net/http"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v48/github"
-	"github.com/nexthink-oss/ghup/internal/remote"
-	"github.com/nexthink-oss/ghup/internal/util"
+	"github.com/google/go-github/v50/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/nexthink-oss/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/util"
 )
 
 var tagName string
