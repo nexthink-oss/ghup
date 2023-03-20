@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/apex/log v1.9.0
-	github.com/go-git/go-git/v5 v5.6.0
+	github.com/go-git/go-git/v5 v5.6.1
 	github.com/google/go-github/v50 v50.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20230215024106-420ad0987b9b
 	github.com/spf13/cobra v1.6.1
