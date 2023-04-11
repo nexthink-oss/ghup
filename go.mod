@@ -7,7 +7,7 @@ require (
 	github.com/go-git/go-git/v5 v5.6.1
 	github.com/google/go-github/v50 v50.2.0
 	github.com/shurcooL/githubv4 v0.0.0-20230215024106-420ad0987b9b
-	github.com/spf13/cobra v1.6.1
+	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	github.com/whilp/git-urls v1.0.0
 	golang.org/x/oauth2 v0.6.0
