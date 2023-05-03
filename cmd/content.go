@@ -24,6 +24,14 @@ var contentCmd = &cobra.Command{
 }
 
 func init() {
+	contentCmd.PersistentFlags().Bool("create-branch", true, "create missing target branch")
+	viper.BindPFlag("create-branch", contentCmd.PersistentFlags().Lookup("create-branch"))
+	viper.BindEnv("create-branch", "GHUP_CREATE_BRANCH")
+
+	contentCmd.PersistentFlags().String("base-branch", "", "base branch name")
+	viper.BindPFlag("base-branch", contentCmd.PersistentFlags().Lookup("base-branch"))
+	viper.BindEnv("base-branch", "GHUP_BASE_BRANCH")
+
 	contentCmd.Flags().StringP("separator", "s", ":", "file-spec separator")
 	viper.BindPFlag("separator", contentCmd.Flags().Lookup("separator"))
 
@@ -47,6 +55,44 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	separator := viper.GetString("separator")
 	if len(separator) < 1 {
 		return fmt.Errorf("invalid separator")
+	}
+
+	repoInfo, err := client.GetRepositoryInfo(owner, repo, branch)
+	if err != nil {
+		return err
+	}
+
+	if repoInfo.IsEmpty {
+		return fmt.Errorf("cannot push to empty repository")
+	}
+
+	targetOid := repoInfo.TargetBranch.Commit
+
+	if targetOid == "" {
+		if !viper.GetBool("create-branch") {
+			return fmt.Errorf("target branch %q does not exist", branch)
+		}
+		log.Debugf("creating target branch %q", branch)
+		baseBranch := viper.GetString("base-branch")
+		if baseBranch == "" {
+			baseBranch = repoInfo.DefaultBranch.Name
+			targetOid = repoInfo.DefaultBranch.Commit
+			log.Debugf("defaulting base branch to %q", baseBranch)
+		} else {
+			targetOid, err = client.GetRefOidV4(owner, repo, baseBranch)
+			if err != nil {
+				return err
+			}
+		}
+
+		createRefInput := githubv4.CreateRefInput{
+			RepositoryID: repoInfo.NodeID,
+			Name:         githubv4.String(fmt.Sprintf("refs/heads/%s", branch)),
+			Oid:          targetOid,
+		}
+		if err := client.CreateRefV4(createRefInput); err != nil {
+			return err
+		}
 	}
 
 	updateFiles := append(args, viper.GetStringSlice("update")...)
@@ -96,17 +142,12 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		Deletions: &deletions,
 	}
 
-	headOid, err := client.GetHeadOidV4(owner, repo, branch)
-	if err != nil {
-		return err
-	}
-
 	message = util.BuildCommitMessage()
 
 	input := githubv4.CreateCommitOnBranchInput{
 		Branch:          remote.CommittableBranch(owner, repo, branch),
 		Message:         remote.CommitMessage(message),
-		ExpectedHeadOid: headOid,
+		ExpectedHeadOid: targetOid,
 		FileChanges:     &changes,
 	}
 

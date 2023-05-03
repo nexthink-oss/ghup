@@ -83,10 +83,12 @@ Usage:
   ghup content [flags] [<file-spec> ...]
 
 Flags:
-  -d, --delete stringArray   file-path to delete
-  -h, --help                 help for update
-  -s, --separator string     separator (default ":")
-  -u, --update stringArray   file-spec to update
+      --base-branch string   base branch name
+      --create-branch        create missing target branch (default true)
+  -d, --delete strings       file-path to delete
+  -h, --help                 help for content
+  -s, --separator string     file-spec separator (default ":")
+  -u, --update strings       file-spec to update
 
 Global Flags:
   -b, --branch string          branch name (default "[local-branch-or-main]")

@@ -79,7 +79,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("repo", "r", defaultRepo, "repository name")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
 
-	rootCmd.PersistentFlags().StringP("branch", "b", defaultBranch, "branch name")
+	rootCmd.PersistentFlags().StringP("branch", "b", defaultBranch, "target branch name")
 	viper.BindPFlag("branch", rootCmd.PersistentFlags().Lookup("branch"))
 	viper.BindEnv("branch", "GHUP_BRANCH", "CHANGE_BRANCH", "BRANCH_NAME", "GIT_BRANCH")
 
