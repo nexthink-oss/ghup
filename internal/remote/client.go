@@ -204,3 +204,21 @@ func (c *TokenClient) CommitOnBranchV4(createCommitOnBranchInput githubv4.Create
 	url = string(mutation.CreateCommitOnBranch.Commit.Url)
 	return
 }
+
+func (c *TokenClient) CreatePullRequestV4(createPullRequestInput githubv4.CreatePullRequestInput) (url string, err error) {
+	var mutation struct {
+		CreatePullRequest struct {
+			PullRequest struct {
+				Permalink githubv4.URI
+			}
+		} `graphql:"createPullRequest(input: $input)"`
+	}
+
+	err = c.V4.Mutate(c.Context, &mutation, createPullRequestInput, nil)
+	if err != nil {
+		return
+	}
+
+	url = mutation.CreatePullRequest.PullRequest.Permalink.String()
+	return
+}
