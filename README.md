@@ -49,7 +49,7 @@ Flags:
       --tag string    tag name
 
 Global Flags:
-  -b, --branch string          branch name (default "[local-branch-or-main]")
+  -b, --branch string          target branch name (default "[local-branch-or-main]")
   -f, --force                  force action
   -m, --message string         message (default "Commit via API")
   -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
@@ -83,13 +83,16 @@ Usage:
   ghup content [flags] [<file-spec> ...]
 
 Flags:
-  -d, --delete stringArray   file-path to delete
-  -h, --help                 help for update
-  -s, --separator string     separator (default ":")
-  -u, --update stringArray   file-spec to update
+      --base-branch string   base branch name (default: "[remote-default-branch]")
+      --create-branch        create missing target branch (default true)
+  -d, --delete strings       file-path to delete
+  -h, --help                 help for content
+      --pr-title string      create pull request iff target branch is created and title is specified
+  -s, --separator string     file-spec separator (default ":")
+  -u, --update strings       file-spec to update
 
 Global Flags:
-  -b, --branch string          branch name (default "[local-branch-or-main]")
+  -b, --branch string          target branch name (default "[local-branch-or-main]")
   -f, --force                  force action
   -m, --message string         message (default "Commit via API")
   -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
@@ -106,6 +109,8 @@ Each `file-spec` provided as a positional argument or explicitly via the `--upda
 Each `file-path` provided to the `--delete` flag is a `<remote-target-path>`: the path to a file on the target repository:branch that should be deleted.
 
 Unless `--force` is used, content that already matches the remote repository state is ignored.
+
+Note: Due to limitations in the GitHub V4 API, when the target branch does not exist, branch creation and content push will trigger two distinct "push" events.
 
 #### Content Example
 

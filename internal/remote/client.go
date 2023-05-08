@@ -17,6 +17,18 @@ type TokenClient struct {
 	V4      *githubv4.Client
 }
 
+type BranchInfo struct {
+	Name   string
+	Commit githubv4.GitObjectID
+}
+
+type RepositoryInfo struct {
+	NodeID        string
+	IsEmpty       bool
+	DefaultBranch BranchInfo
+	TargetBranch  BranchInfo
+}
+
 func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err error) {
 	token, err = ResolveToken(token)
 	if err != nil {
@@ -56,6 +68,53 @@ func ResolveToken(tokenVar string) (token string, err error) {
 	return
 }
 
+func (c *TokenClient) GetRepositoryInfo(owner string, repo string, branch string) (repository RepositoryInfo, err error) {
+	var query struct {
+		Repository struct {
+			Id               githubv4.String
+			IsEmpty          githubv4.Boolean
+			DefaultBranchRef struct {
+				Name   githubv4.String
+				Target struct {
+					Oid githubv4.GitObjectID
+				}
+			}
+			Ref *struct {
+				Target struct {
+					Oid githubv4.GitObjectID
+				}
+			} `graphql:"ref(qualifiedName: $branch)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(owner),
+		"repo":   githubv4.String(repo),
+		"branch": githubv4.String(branch),
+	}
+	err = c.V4.Query(c.Context, &query, variables)
+	if err != nil {
+		return
+	}
+
+	repository = RepositoryInfo{
+		NodeID:  string(query.Repository.Id),
+		IsEmpty: bool(query.Repository.IsEmpty),
+		DefaultBranch: BranchInfo{
+			Name:   string(query.Repository.DefaultBranchRef.Name),
+			Commit: query.Repository.DefaultBranchRef.Target.Oid,
+		},
+	}
+
+	if query.Repository.Ref != nil {
+		repository.TargetBranch = BranchInfo{
+			Name:   branch,
+			Commit: query.Repository.Ref.Target.Oid,
+		}
+	}
+
+	return
+}
+
 func (c *TokenClient) GetFileHashV4(owner string, repo string, branch string, path string) (hash string) {
 	var query struct {
 		Repository struct {
@@ -81,21 +140,21 @@ func (c *TokenClient) GetFileHashV4(owner string, repo string, branch string, pa
 	return
 }
 
-func (c *TokenClient) GetHeadOidV4(owner string, repo string, branch string) (oid githubv4.GitObjectID, err error) {
+func (c *TokenClient) GetRefOidV4(owner string, repo string, refName string) (oid githubv4.GitObjectID, err error) {
 	var query struct {
 		Repository struct {
 			Ref struct {
 				Target struct {
-					Oid githubv4.String
+					Oid githubv4.GitObjectID
 				}
-			} `graphql:"ref(qualifiedName: $branchName)"`
+			} `graphql:"ref(qualifiedName: $refName)"`
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
 	variables := map[string]interface{}{
-		"owner":      githubv4.String(owner),
-		"repo":       githubv4.String(repo),
-		"branchName": githubv4.String(branch),
+		"owner":   githubv4.String(owner),
+		"repo":    githubv4.String(repo),
+		"refName": githubv4.String(refName),
 	}
 
 	err = c.V4.Query(c.Context, &query, variables)
@@ -103,7 +162,26 @@ func (c *TokenClient) GetHeadOidV4(owner string, repo string, branch string) (oi
 		return
 	}
 
-	oid = githubv4.GitObjectID(query.Repository.Ref.Target.Oid)
+	oid = query.Repository.Ref.Target.Oid
+	if oid == "" {
+		err = fmt.Errorf("ref %q does not exist", refName)
+	}
+	return
+}
+
+func (c *TokenClient) CreateRefV4(createRefInput githubv4.CreateRefInput) (err error) {
+	var mutation struct {
+		CreateRef struct {
+			Ref struct {
+				Target struct {
+					Oid githubv4.GitObjectID
+				}
+			}
+		} `graphql:"createRef(input: $input)"`
+	}
+
+	err = c.V4.Mutate(c.Context, &mutation, createRefInput, nil)
+
 	return
 }
 
@@ -124,5 +202,23 @@ func (c *TokenClient) CommitOnBranchV4(createCommitOnBranchInput githubv4.Create
 
 	oid = mutation.CreateCommitOnBranch.Commit.Oid
 	url = string(mutation.CreateCommitOnBranch.Commit.Url)
+	return
+}
+
+func (c *TokenClient) CreatePullRequestV4(createPullRequestInput githubv4.CreatePullRequestInput) (url string, err error) {
+	var mutation struct {
+		CreatePullRequest struct {
+			PullRequest struct {
+				Permalink githubv4.URI
+			}
+		} `graphql:"createPullRequest(input: $input)"`
+	}
+
+	err = c.V4.Mutate(c.Context, &mutation, createPullRequestInput, nil)
+	if err != nil {
+		return
+	}
+
+	url = mutation.CreatePullRequest.PullRequest.Permalink.String()
 	return
 }
