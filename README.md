@@ -87,6 +87,7 @@ Flags:
       --create-branch        create missing target branch (default true)
   -d, --delete strings       file-path to delete
   -h, --help                 help for content
+      --pr-draft             create pull request in draft mode
       --pr-title string      create pull request iff target branch is created and title is specified
   -s, --separator string     file-spec separator (default ":")
   -u, --update strings       file-spec to update

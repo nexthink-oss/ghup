@@ -32,6 +32,10 @@ func init() {
 	viper.BindPFlag("pr-title", contentCmd.PersistentFlags().Lookup("pr-title"))
 	viper.BindEnv("pr-title", "GHUP_PR_TITLE")
 
+	contentCmd.PersistentFlags().Bool("pr-draft", false, "create pull request in draft mode")
+	viper.BindPFlag("pr-draft", contentCmd.PersistentFlags().Lookup("pr-draft"))
+	viper.BindEnv("pr-draft", "GHUP_PR_DRAFT")
+
 	contentCmd.PersistentFlags().String("base-branch", "", `base branch name (default: "[remote-default-branch])"`)
 	viper.BindPFlag("base-branch", contentCmd.PersistentFlags().Lookup("base-branch"))
 	viper.BindEnv("base-branch", "GHUP_BASE_BRANCH")
@@ -167,6 +171,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		input := githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.NodeID,
 			BaseRefName:  githubv4.String(baseBranch),
+			Draft:        githubv4.NewBoolean(githubv4.Boolean(viper.GetBool("pr-draft"))),
 			HeadRefName:  githubv4.String(branch),
 			Title:        githubv4.String(title),
 		}
