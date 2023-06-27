@@ -6,6 +6,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/go-git/go-git/v5 v5.7.0
 	github.com/google/go-github/v50 v50.2.0
+	github.com/pkg/errors v0.9.1
 	github.com/shurcooL/githubv4 v0.0.0-20230424031643-6cea62ecd5a9
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
@@ -38,7 +39,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
 	github.com/skeema/knownhosts v1.1.1 // indirect
