@@ -113,7 +113,7 @@ func initLogger() {
 	log.SetHandler(cli.New(os.Stderr))
 
 	verbosity := viper.GetInt("verbosity")
-	log.SetLevel(log.Level(int(log.InfoLevel) - verbosity))
+	log.SetLevel(log.Level(int(log.WarnLevel) - verbosity))
 }
 
 // validateFlags checks mandatory flags are valid and stores results in shared variables
