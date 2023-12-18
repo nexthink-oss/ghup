@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/apex/log v1.9.0
-	github.com/go-git/go-git/v5 v5.10.1
+	github.com/go-git/go-git/v5 v5.11.0
 	github.com/google/go-github/v50 v50.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/shurcooL/githubv4 v0.0.0-20230424031643-6cea62ecd5a9
