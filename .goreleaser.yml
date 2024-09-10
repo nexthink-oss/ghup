@@ -1,14 +1,21 @@
+version: 2
 before:
   hooks:
     - go mod tidy
 builds:
-  - env:
+  - main: .
+    binary: ghup
+    env:
       - CGO_ENABLED=0
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
     ldflags:
-      - "-s -w -X github.com/nexthink-oss/ghup/cmd.buildVersion={{.Version}} -X github.com/nexthink-oss/ghup/cmd.buildCommit={{.ShortCommit}} -X github.com/nexthink-oss/ghup/cmd.buildDate={{.Date}}"
+      - >-
+        -s -w
+        -X github.com/nexthink-oss/ghup/cmd.version={{.Version}}
+        -X github.com/nexthink-oss/ghup/cmd.commit={{.ShortCommit}}
+        -X github.com/nexthink-oss/ghup/cmd.date={{.Date}}
     goos:
       - freebsd
       - windows
@@ -19,12 +26,11 @@ builds:
       - "386"
       - arm
       - arm64
-    binary: ghup
 archives:
   - format: zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
   algorithm: sha256
@@ -37,11 +43,11 @@ changelog:
       - "^docs:"
       - "^test:"
 brews:
-  - tap:
+  - repository:
       owner: isometry
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    folder: Formula
+    directory: Formula
     description: A GitHub API client for managing tags and repository content from third-party automation systems
     homepage: https://just.breathe.io/project/ghup/
     test: |

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/go-github/v50/github"
+	"github.com/google/go-github/v64/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )

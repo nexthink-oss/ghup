@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	buildVersion string = "snapshot"
-	buildCommit  string = "unknown"
-	buildDate    string = "unknown"
+	version string = "snapshot"
+	commit  string = "unknown"
+	date    string = "unknown"
 
 	localRepo        *local.Repository
 	defaultUserName  string
@@ -37,7 +37,7 @@ var rootCmd = &cobra.Command{
 	Use:          "ghup",
 	Short:        "Update GitHub content and tags via API",
 	SilenceUsage: true,
-	Version:      fmt.Sprintf("%s-%s (built %s)", buildVersion, buildCommit, buildDate),
+	Version:      fmt.Sprintf("%s-%s (built %s)", version, commit, date),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -99,6 +99,8 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force action")
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))
+
+	rootCmd.Flags().SortFlags = false
 }
 
 // initViper initializes Viper to load config from the environment

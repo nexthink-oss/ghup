@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v50/github"
+	"github.com/google/go-github/v64/github"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,6 +31,8 @@ func init() {
 
 	tagCmd.Flags().Bool("lightweight", false, "force lightweight tag")
 	viper.BindPFlag("lightweight", tagCmd.Flags().Lookup("lightweight"))
+
+	tagCmd.Flags().SortFlags = false
 
 	rootCmd.AddCommand(tagCmd)
 }

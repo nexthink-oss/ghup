@@ -50,6 +50,8 @@ func init() {
 	contentCmd.Flags().StringSliceP("delete", "d", []string{}, "file-path to delete")
 	viper.BindPFlag("delete", contentCmd.Flags().Lookup("delete"))
 
+	contentCmd.Flags().SortFlags = false
+
 	rootCmd.AddCommand(contentCmd)
 }
 
