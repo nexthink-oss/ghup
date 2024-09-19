@@ -33,6 +33,10 @@ func init() {
 	viper.BindPFlag("pr-title", contentCmd.PersistentFlags().Lookup("pr-title"))
 	viper.BindEnv("pr-title", "GHUP_PR_TITLE")
 
+	contentCmd.PersistentFlags().String("pr-body", "", "pull request body")
+	viper.BindPFlag("pr-body", contentCmd.PersistentFlags().Lookup("pr-body"))
+	viper.BindEnv("pr-body", "GHUP_PR_BODY")
+
 	contentCmd.PersistentFlags().Bool("pr-draft", false, "create pull request in draft mode")
 	viper.BindPFlag("pr-draft", contentCmd.PersistentFlags().Lookup("pr-draft"))
 	viper.BindEnv("pr-draft", "GHUP_PR_DRAFT")
@@ -174,6 +178,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if title := viper.GetString("pr-title"); newBranch && title != "" {
+		body := githubv4.String(viper.GetString("pr-body"))
 		log.Infof("opening pull request from %q to %q", branch, baseBranch)
 		input := githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.NodeID,
@@ -181,6 +186,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			Draft:        githubv4.NewBoolean(githubv4.Boolean(viper.GetBool("pr-draft"))),
 			HeadRefName:  githubv4.String(branch),
 			Title:        githubv4.String(title),
+			Body:         &body,
 		}
 		log.Debugf("CreatePullRequestInput: %+v", input)
 		pullRequestUrl, err := client.CreatePullRequestV4(input)
