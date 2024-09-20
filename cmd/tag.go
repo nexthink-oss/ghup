@@ -78,7 +78,6 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		annotatedTag := &github.Tag{
 			Tag:     &tagName,
 			Message: &message,
-			// Message: github.String("hard-coded message"),
 			Object: &github.GitObject{
 				Type: github.String("commit"),
 				SHA:  github.String(branchRef.Object.GetSHA()),
@@ -95,13 +94,6 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		tagRefObject = branchRef.Object.GetSHA()
 	}
 
-	if existingTagRef != nil {
-		log.Infof("deleting existing tag reference")
-		if _, err := client.V3.Git.DeleteRef(ctx, owner, repo, existingTagRef.GetRef()); err != nil {
-			return errors.Wrap(err, "DeleteRef")
-		}
-	}
-
 	tagRef := &github.Reference{
 		Ref: &tagRefName,
 		Object: &github.GitObject{
@@ -109,10 +101,18 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		},
 	}
 
-	log.Infof("creating tag reference")
-	_, _, err = client.V3.Git.CreateRef(ctx, owner, repo, tagRef)
-	if err != nil {
-		return errors.Wrap(err, "CreateRef")
+	if existingTagRef == nil {
+		log.Infof("creating tag reference")
+		_, _, err = client.V3.Git.CreateRef(ctx, owner, repo, tagRef)
+		if err != nil {
+			return errors.Wrap(err, "CreateRef")
+		}
+	} else {
+		log.Infof("updating tag reference")
+		_, _, err = client.V3.Git.UpdateRef(ctx, owner, repo, tagRef, true)
+		if err != nil {
+			return errors.Wrap(err, "UpdateRef")
+		}
 	}
 
 	fmt.Printf("https://github.com/%s/%s/releases/tag/%s\n", owner, repo, tagName)
