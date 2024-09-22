@@ -111,7 +111,8 @@ func init() {
 func initViper() {
 	viper.SetEnvPrefix("GHUP")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
-	viper.AutomaticEnv() // read in environment variables that match bound variables
+	viper.AutomaticEnv()      // read in environment variables that match bound variables
+	viper.AllowEmptyEnv(true) // respect empty environment variables
 }
 
 // initLogger initializes the logger subsystem

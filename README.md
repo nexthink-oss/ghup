@@ -22,7 +22,7 @@ Note: works well with [vault-plugin-secrets-github](https://github.com/martinbai
 
 ## Configuration
 
-If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--author.trailer`, `--user.name` and `--user.email`, or disable with `--author.trailer=` or `GHUP_AUTHOR_TRAILER=-`). Additional commit trailers can be specified with `--trailer key=value` flags.
+If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--author.trailer`, `--user.name` and `--user.email`, or disable with `--author.trailer=` or `export GHUP_AUTHOR_TRAILER=`). Additional commit trailers can be specified with `--trailer key=value` flags.
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
@@ -235,4 +235,24 @@ target:
   - ref: tags/v1
     updated: true
     sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+```
+
+### Debug Info
+
+In order to better validate the configuration derived from context (working directory, environment variables and global flags), the `info` verb is available:
+
+```console
+$ ghup info
+hasToken: true
+trailers:
+  - 'Co-Authored-By: Example User <user@example.com>'
+owner: nexthink-oss
+repository: ghup
+branch: feature/branch
+commit: 5e1692253399bd9ea6077dba27e4cdc8a15b9720
+isClean: false
+commitMessage:
+  headline: Commit via API
+  body: |2-
+    Co-Authored-By: Example User <user@example.com>
 ```
