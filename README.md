@@ -9,19 +9,20 @@ A GitHub API client for managing tags and repository content from third-party au
 
 * Create and update tags, both lightweight and annotated.
 * Add, update and delete content idempotently.
+* Idempotent ref copying (e.g. fast-forward merge or bulk tagging).
 * GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
 * Configuration defaults inferred from local context (e.g. git clone and environment).
 * Completely self-contained: no external dependencies.
 
 ## Requirements
 
-* A GitHub Token, preferably derived from GitHub App credentials, with `contents=write` and `metadata=read` permissions on target repository.
+* A GitHub Token, preferably derived from GitHub App credentials (for verified commits), with `contents=write` and `metadata=read` permissions on target repository. In addition, `workflows=write` is also needed if used to manage `.github/workflows` content.
 
 Note: works well with [vault-plugin-secrets-github](https://github.com/martinbaillie/vault-plugin-secrets-github)!
 
 ## Configuration
 
-If the current working directory is a git repository, the first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Signed-off-by` message suffix (`--trailer.name` and `--trailer.email`) to help distinguish between different systems sharing common GitHub App credentials.
+If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Co-Authored-By` message suffix (`--trailer.name` and `--trailer.email`) to help distinguish between different systems sharing common GitHub App credentials (disable with `--trailer.key=""`).
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
@@ -29,50 +30,14 @@ All configuration may be passed via environment variable rather than flag. The e
 
 In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_OWNER`, `GITHUB_TOKEN`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
 
-For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or, better, file path (`--token /path/to/token-file`)
+For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/token-file`, `--token <(gh auth token)` or `export GHUP_TOKEN=/path/to/token-file ghup …`)
 
 ## Usage
 
-### Tagging
-
-```console
-$ ghup tag --help
-
-Manage tags via the GitHub V3 API
-
-Usage:
-  ghup tag [flags] [<name>]
-
-Flags:
-  -h, --help          help for tag
-      --lightweight   force lightweight tag
-      --tag string    tag name
-
-Global Flags:
-  -b, --branch string          target branch name (default "[local-branch-or-main]")
-  -f, --force                  force action
-  -m, --message string         message (default "Commit via API")
-  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string           GitHub Token or path/to/token-file
-      --trailer.email string   email for commit trailer (default "[user.email]")
-      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
-      --trailer.name string    name for commit trailer (default "[user.name]")
-  -v, --verbosity count        verbosity
-```
-
-Note: annotated tags are the default, but only lightweight tags (i.e. `--lightweight`), which simply point at an existing commit, are "verified".
-
-#### Tagging Example
-
-Tag the current repo with `v1.0`:
-
-```console
-$ ghup tag v1.0 -m "Release v1.0!"
-https://github.com/nexthink-oss/ghup/releases/tag/v1.0
-```
-
 ### Content
+
+The `content` verb is used to generate arbitrary (verified) commits via the GitHub V4 API.
+An arbitrary number of content adds, removes and deletes can be committed without the need for a local signing key or for checking out the target repository.
 
 ```console
 $ ghup content --help
@@ -87,6 +52,7 @@ Flags:
       --create-branch        create missing target branch (default true)
   -d, --delete strings       file-path to delete
   -h, --help                 help for content
+      --pr-body string       pull request description body
       --pr-draft             create pull request in draft mode
       --pr-title string      create pull request iff target branch is created and title is specified
   -s, --separator string     file-spec separator (default ":")
@@ -115,20 +81,155 @@ Note: Due to limitations in the GitHub V4 API, when the target branch does not e
 
 #### Content Example
 
-Update `.zshrc` in my `dotfiles` repo, adding if 's missing and updating if-and-only-if changed:
+##### Idempotent file add/update
+
+Update `.zshrc` in my `dotfiles` repo, adding if's missing and updating if-and-only-if changed:
 
 ```console
-$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "Update zshrc"
+$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "chore: update zshrc"
 https://github.com/isometry/dotfiles/commit/15b8630c81a051c2b128c94e5796c5d9c2bc8846
-$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "Update zshrc"
+$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "chore: update zshrc"
 nothing to do
 ```
+
+##### Idempotent file deletion
 
 Delete `.tcshrc` from my `dotfiles` repo:
 
 ```console
-$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "Remove tcshrc"
+$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "chore: remove tcshrc"
 https://github.com/isometry/dotfiles/commit/bf120a96c65cb482eacc3c9e27d2d0935d108eca
-$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "Remove tcshrc"
+$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "chore: remove tcshrc"
 nothing to do
+```
+
+### Tagging
+
+The `tag` verb is used to create lightweight or annotated tags without the need to checkout the target repository.
+
+Note: annotated tags are the default, but only lightweight tags (i.e. `--lightweight`), which simply point at an existing commit, are "verified".
+
+```console
+$ ghup tag --help
+
+Manage tags via the GitHub V3 API
+
+Usage:
+  ghup tag [flags] [<name>]
+
+Flags:
+  -h, --help          help for tag
+  -l, --lightweight   force lightweight tag
+      --tag string    tag name
+
+Global Flags:
+  -b, --branch string          target branch name (default "[local-branch-or-main]")
+  -f, --force                  force action
+  -m, --message string         message (default "Commit via API")
+  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string           GitHub Token or path/to/token-file
+      --trailer.email string   email for commit trailer (default "[user.email]")
+      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
+      --trailer.name string    name for commit trailer (default "[user.name]")
+  -v, --verbosity count        verbosity
+```
+
+#### Tagging Example
+
+##### Create lightweight tag
+
+Create lightweight tag `v1.0.0` pointing at the head of the local repository's checked out branch:
+
+```console
+$ ghup tag v1.0.0
+https://github.com/nexthink-oss/ghup/releases/tag/v1.0.0
+```
+
+##### Create annotated tag
+
+Create an annotated repo `v1.0` pointed at the head of the `main` branch of the `ghup` repo owned by `nexthink-oss`:
+
+```console
+$ ghup -o nexthink-oss -r ghup -b main tag v1.0 -m "Release v1.0!"
+https://github.com/nexthink-oss/ghup/releases/tag/v1.0
+```
+
+### Ref Copying
+
+The `ref` verb is used to update an arbitrary number `head` or `tag` references to match a source reference.
+
+The `source_ref` may take the form of a partial commit hash, or of a fully- or partially-qualified reference, defaulting to a branch reference (`heads/…`; overrideable via `--source-type=tags`).
+The `target_ref`(s) must take the form of fully- or partially-qualified references, defaulting to tag references, defaulting to tag references (`tags/…`; overrideable via `--target-type=heads`). The `--force` flag will override standard fast-forward-only protection on branch updates.
+
+```console
+$ ghup ref --help
+Update target_refs to match source_ref
+
+Usage:
+  ghup ref [flags] <source_ref> <target_ref>...
+
+Flags:
+  -S, --source-type string   default source ref type (choices: [heads, tags]) (default "heads")
+  -T, --target-type string   default target ref type (choices: [tags, heads]) (default "tags")
+  -h, --help                 help for ref
+
+Global Flags:
+  -b, --branch string          target branch name (default "[local-branch-or-main]")
+  -f, --force                  force action
+  -m, --message string         message (default "Commit via API")
+  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string           GitHub Token or path/to/token-file
+      --trailer.email string   email for commit trailer (default "[user.email]")
+      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
+      --trailer.name string    name for commit trailer (default "[user.name]")
+  -v, --verbosity count        verbosity
+```
+
+Note: the `--branch`, `--message` and `--trailer.*` flags are not used by the `ref` verb.
+
+#### Ref Copying Example
+
+##### Fast-forward production branch to match staging
+
+```console
+$ ghup ref staging heads/production
+source:
+  ref: heads/staging
+  sha: 206e1a484f03cd320a2125a50aa73bd8a2b045dc
+target:
+  - ref: heads/production
+    updated: true
+    old_sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+    sha: 206e1a484f03cd320a2125a50aa73bd8a2b045dc
+```
+
+##### Create a lightweight tag pointing at a specific commit
+
+```console
+$ ghup ref b7ccc4d example
+source:
+  ref: b7ccc4d
+  sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+target:
+  - ref: tags/example
+    updated: true
+    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+```
+
+##### Update GitHub Actions-style major and minor tags following patch release:
+
+```console
+$ ghup ref tags/v1.1.7 v1.1 v1
+source:
+  ref: tags/v1.1.7
+  sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+target:
+  - ref: tags/v1.1
+    updated: true
+    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+  - ref: tags/v1
+    updated: true
+    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
 ```

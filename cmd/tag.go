@@ -27,7 +27,7 @@ func init() {
 	tagCmd.Flags().String("tag", "", "tag name")
 	viper.BindPFlag("tag", tagCmd.Flags().Lookup("tag"))
 
-	tagCmd.Flags().Bool("lightweight", false, "force lightweight tag")
+	tagCmd.Flags().BoolP("lightweight", "l", false, "force lightweight tag")
 	viper.BindPFlag("lightweight", tagCmd.Flags().Lookup("lightweight"))
 
 	tagCmd.Flags().SortFlags = false
