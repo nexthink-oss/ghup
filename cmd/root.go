@@ -86,16 +86,20 @@ func init() {
 	rootCmd.PersistentFlags().StringP("message", "m", "Commit via API", "message")
 	viper.BindPFlag("message", rootCmd.PersistentFlags().Lookup("message"))
 
-	rootCmd.PersistentFlags().String("trailer.key", "Co-Authored-By", "key for commit trailer (blank to disable)")
-	viper.BindPFlag("trailer.key", rootCmd.PersistentFlags().Lookup("trailer.key"))
+	rootCmd.PersistentFlags().String("author.trailer", "Co-Authored-By", "key for commit author trailer (blank to disable)")
+	viper.BindPFlag("author.trailer", rootCmd.PersistentFlags().Lookup("author.trailer"))
+	viper.BindEnv("author.trailer", "GHUP_TRAILER_KEY")
 
-	rootCmd.PersistentFlags().String("trailer.name", defaultUserName, "name for commit trailer")
-	viper.BindPFlag("trailer.name", rootCmd.PersistentFlags().Lookup("trailer.name"))
-	viper.BindEnv("trailer.name", "GHUP_USER_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME")
+	rootCmd.PersistentFlags().String("user.name", defaultUserName, "name for commit author trailer")
+	viper.BindPFlag("user.name", rootCmd.PersistentFlags().Lookup("user.name"))
+	viper.BindEnv("user.name", "GHUP_TRAILER_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME")
 
-	rootCmd.PersistentFlags().String("trailer.email", defaultUserEmail, "email for commit trailer")
-	viper.BindPFlag("trailer.email", rootCmd.PersistentFlags().Lookup("trailer.email"))
-	viper.BindEnv("trailer.email", "GHUP_USER_EMAIL", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL")
+	rootCmd.PersistentFlags().String("user.email", defaultUserEmail, "email for commit author trailer")
+	viper.BindPFlag("user.email", rootCmd.PersistentFlags().Lookup("user.email"))
+	viper.BindEnv("user.email", "GHUP_TRAILER_EMAIL", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL")
+
+	rootCmd.PersistentFlags().StringToString("trailer", nil, "additional commit trailer (key=value; JSON via environment)")
+	viper.BindPFlag("trailer", rootCmd.PersistentFlags().Lookup("trailer"))
 
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force action")
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))

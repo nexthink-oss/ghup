@@ -9,7 +9,7 @@ A GitHub API client for managing tags and repository content from third-party au
 
 * Create and update tags, both lightweight and annotated.
 * Add, update and delete content idempotently.
-* Idempotent ref copying (e.g. fast-forward merge or bulk tagging).
+* Idempotent ref copying (e.g. fast-forward merge and mutable tag updates).
 * GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
 * Configuration defaults inferred from local context (e.g. git clone and environment).
 * Completely self-contained: no external dependencies.
@@ -22,11 +22,11 @@ Note: works well with [vault-plugin-secrets-github](https://github.com/martinbai
 
 ## Configuration
 
-If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for generated `Co-Authored-By` message suffix (`--trailer.name` and `--trailer.email`) to help distinguish between different systems sharing common GitHub App credentials (disable with `--trailer.key=""`).
+If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--author.trailer`, `--user.name` and `--user.email`, or disable with `--author.trailer=` or `GHUP_AUTHOR_TRAILER=-`). Additional commit trailers can be specified with `--trailer key=value` flags.
 
 If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
 
-All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_TRAILER_KEY`, etc.
+All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_AUTHOR_TRAILER`, etc.
 
 In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_OWNER`, `GITHUB_TOKEN`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
 
@@ -59,16 +59,17 @@ Flags:
   -u, --update strings       file-spec to update
 
 Global Flags:
-  -b, --branch string          target branch name (default "[local-branch-or-main]")
-  -f, --force                  force action
-  -m, --message string         message (default "Commit via API")
-  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string           GitHub Token or path/to/token-file
-      --trailer.email string   email for commit trailer (default "[user.email]")
-      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
-      --trailer.name string    name for commit trailer (default "[user.name]")
-  -v, --verbosity count        verbosity
+      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch string            target branch name (default "feature/ref")
+  -f, --force                    force action
+  -m, --message string           message (default "Commit via API")
+  -o, --owner string             repository owner (default "isometry")
+  -r, --repo string              repository name (default "ghup")
+      --token string             GitHub Token or path/to/token-file
+      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
+      --user.email string        email for commit author trailer (default "robin@isometry.net")
+      --user.name string         name for commit author trailer (default "Robin Breathe")
+  -v, --verbosity count          verbosity
 ```
 
 Each `file-spec` provided as a positional argument or explicitly via the `--update` flag takes the form `<local-file-path>[:<remote-target-path>]`. Content is read from the local file `<local-file-path>` and written to `<remote-target-path>` (defaulting to `<local-file-path>` if not specified).
@@ -123,16 +124,17 @@ Flags:
       --tag string    tag name
 
 Global Flags:
-  -b, --branch string          target branch name (default "[local-branch-or-main]")
-  -f, --force                  force action
-  -m, --message string         message (default "Commit via API")
-  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string           GitHub Token or path/to/token-file
-      --trailer.email string   email for commit trailer (default "[user.email]")
-      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
-      --trailer.name string    name for commit trailer (default "[user.name]")
-  -v, --verbosity count        verbosity
+      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch string            target branch name (default "feature/ref")
+  -f, --force                    force action
+  -m, --message string           message (default "Commit via API")
+  -o, --owner string             repository owner (default "isometry")
+  -r, --repo string              repository name (default "ghup")
+      --token string             GitHub Token or path/to/token-file
+      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
+      --user.email string        email for commit author trailer (default "robin@isometry.net")
+      --user.name string         name for commit author trailer (default "Robin Breathe")
+  -v, --verbosity count          verbosity
 ```
 
 #### Tagging Example
@@ -175,16 +177,17 @@ Flags:
   -h, --help                 help for ref
 
 Global Flags:
-  -b, --branch string          target branch name (default "[local-branch-or-main]")
-  -f, --force                  force action
-  -m, --message string         message (default "Commit via API")
-  -o, --owner string           repository owner (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo string            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string           GitHub Token or path/to/token-file
-      --trailer.email string   email for commit trailer (default "[user.email]")
-      --trailer.key string     key for commit trailer (blank to disable) (default "Co-Authored-By")
-      --trailer.name string    name for commit trailer (default "[user.name]")
-  -v, --verbosity count        verbosity
+      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch string            target branch name (default "feature/ref")
+  -f, --force                    force action
+  -m, --message string           message (default "Commit via API")
+  -o, --owner string             repository owner (default "isometry")
+  -r, --repo string              repository name (default "ghup")
+      --token string             GitHub Token or path/to/token-file
+      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
+      --user.email string        email for commit author trailer (default "robin@isometry.net")
+      --user.name string         name for commit author trailer (default "Robin Breathe")
+  -v, --verbosity count          verbosity
 ```
 
 Note: the `--branch`, `--message` and `--trailer.*` flags are not used by the `ref` verb.

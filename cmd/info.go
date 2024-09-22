@@ -10,8 +10,8 @@ import (
 )
 
 type info struct {
-	HasToken   bool   `yaml:"hasToken"`
-	Trailer    string `yaml:"trailer,omitempty"`
+	HasToken   bool     `yaml:"hasToken"`
+	Trailers   []string `yaml:"trailers,omitempty"`
 	Owner      string
 	Repository string
 	Branch     string
@@ -34,7 +34,7 @@ func init() {
 func runInfoCmd(cmd *cobra.Command, args []string) (err error) {
 	i := info{
 		HasToken:   len(viper.GetString("token")) > 0,
-		Trailer:    util.BuildTrailer(),
+		Trailers:   util.BuildTrailers(),
 		Owner:      owner,
 		Repository: repo,
 		Branch:     branch,

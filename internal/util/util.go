@@ -46,25 +46,29 @@ func BuildCommitMessage() (message string) {
 		}
 		messageParts = append(messageParts, message)
 	}
-	if trailer := BuildTrailer(); trailer != "" {
-		messageParts = append(messageParts, "", trailer)
+	if trailers := BuildTrailers(); len(trailers) > 0 {
+		messageParts = append(messageParts, "")
+		messageParts = append(messageParts, trailers...)
 	}
 	message = strings.Join(messageParts, "\n")
 	return
 }
 
-func BuildTrailer() (trailer string) {
-	if trailerKey := viper.GetString("trailer.key"); trailerKey != "" {
+func BuildTrailers() (trailers []string) {
+	if trailerKey := viper.GetString("author.trailer"); trailerKey != "" && trailerKey != "-" {
 		var userParts []string
-		if userName := viper.GetString("trailer.name"); userName != "" {
+		if userName := viper.GetString("user.name"); userName != "" {
 			userParts = append(userParts, userName)
 		}
-		if userEmail := viper.GetString("trailer.email"); userEmail != "" {
+		if userEmail := viper.GetString("user.email"); userEmail != "" {
 			userParts = append(userParts, fmt.Sprintf("<%s>", userEmail))
 		}
 		if len(userParts) > 0 {
-			trailer = fmt.Sprintf("%s: %s", trailerKey, strings.Join(userParts, " "))
+			trailers = append(trailers, fmt.Sprintf("%s: %s", trailerKey, strings.Join(userParts, " ")))
 		}
+	}
+	for key, value := range viper.GetStringMapString("trailer") {
+		trailers = append(trailers, fmt.Sprintf("%s: %s", key, value))
 	}
 	return
 }
