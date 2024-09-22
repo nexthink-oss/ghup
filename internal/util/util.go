@@ -1,11 +1,14 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Coalesce returns the first not empty string
@@ -16,6 +19,23 @@ func Coalesce(values ...string) (value string) {
 		}
 	}
 	return
+}
+
+func EncodeYAML(obj any) string {
+	var b bytes.Buffer
+
+	e := yaml.NewEncoder(&b)
+	e.SetIndent(2)
+
+	_ = e.Encode(obj)
+
+	return b.String()
+}
+
+func IsCommitHash(ref string) bool {
+	commitHashPattern := `^[0-9a-f]{7,40}$`
+	matched, _ := regexp.MatchString(commitHashPattern, ref)
+	return matched
 }
 
 func BuildCommitMessage() (message string) {

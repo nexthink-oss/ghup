@@ -1,8 +1,10 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -66,6 +68,31 @@ func ResolveToken(tokenVar string) (token string, err error) {
 	}
 
 	return
+}
+
+func WithAccept(accept string) github.RequestOption {
+	return func(req *http.Request) {
+		req.Header.Set("Accept", accept)
+	}
+}
+
+// GetCommitSHA validates the existence of and retrieves the full SHA
+// of a commit given a short SHA
+func (c *TokenClient) GetCommitSHA(ctx context.Context, owner string, repo string, sha string) (*string, *github.Response, error) {
+	u := fmt.Sprintf("repos/%v/%v/commits/%v", owner, repo, sha)
+	req, err := c.V3.NewRequest("GET", u, nil, WithAccept("application/vnd.github.sha"))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var commit bytes.Buffer
+	resp, err := c.V3.Do(ctx, req, &commit)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	commitSHA := commit.String()
+	return &commitSHA, resp, nil
 }
 
 func (c *TokenClient) GetRepositoryInfo(owner string, repo string, branch string) (repository RepositoryInfo, err error) {

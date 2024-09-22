@@ -15,8 +15,6 @@ import (
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-var tagName string
-
 var tagCmd = &cobra.Command{
 	Use:     "tag [flags] [<name>]",
 	Short:   "Manage tags via the GitHub V3 API",
@@ -45,7 +43,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		return errors.Wrap(err, "NewTokenClient")
 	}
 
-	tagName = viper.GetString("tag")
+	tagName := viper.GetString("tag")
 
 	if len(args) == 1 {
 		tagName = args[0]
