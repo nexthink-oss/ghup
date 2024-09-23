@@ -15,8 +15,6 @@ import (
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-var tagName string
-
 var tagCmd = &cobra.Command{
 	Use:     "tag [flags] [<name>]",
 	Short:   "Manage tags via the GitHub V3 API",
@@ -29,7 +27,7 @@ func init() {
 	tagCmd.Flags().String("tag", "", "tag name")
 	viper.BindPFlag("tag", tagCmd.Flags().Lookup("tag"))
 
-	tagCmd.Flags().Bool("lightweight", false, "force lightweight tag")
+	tagCmd.Flags().BoolP("lightweight", "l", false, "force lightweight tag")
 	viper.BindPFlag("lightweight", tagCmd.Flags().Lookup("lightweight"))
 
 	tagCmd.Flags().SortFlags = false
@@ -45,7 +43,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		return errors.Wrap(err, "NewTokenClient")
 	}
 
-	tagName = viper.GetString("tag")
+	tagName := viper.GetString("tag")
 
 	if len(args) == 1 {
 		tagName = args[0]
@@ -58,6 +56,10 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	branchRefName := fmt.Sprintf("heads/%s", branch)
 
 	tagRefName := fmt.Sprintf("tags/%s", tagName)
+	if err := util.IsValidRefName(tagRefName); err != nil {
+		return errors.Wrapf(err, "Invalid tag reference: %s", tagRefName)
+	}
+
 	var tagRefObject string
 
 	log.Infof("getting tag reference: %s", tagRefName)

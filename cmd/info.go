@@ -3,20 +3,22 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/nexthink-oss/ghup/internal/remote"
 	"github.com/nexthink-oss/ghup/internal/util"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 type info struct {
-	HasToken   bool   `yaml:"hasToken"`
-	Trailer    string `yaml:"trailer,omitempty"`
-	Owner      string
-	Repository string
-	Branch     string
-	Commit     string
-	IsClean    bool `yaml:"isClean"`
+	HasToken      bool     `yaml:"hasToken"`
+	Trailers      []string `yaml:"trailers,omitempty"`
+	Owner         string
+	Repository    string
+	Branch        string
+	Commit        string
+	IsClean       bool                   `yaml:"isClean"`
+	CommitMessage githubv4.CommitMessage `yaml:"commitMessage"`
 }
 
 var infoCmd = &cobra.Command{
@@ -33,11 +35,12 @@ func init() {
 
 func runInfoCmd(cmd *cobra.Command, args []string) (err error) {
 	i := info{
-		HasToken:   len(viper.GetString("token")) > 0,
-		Trailer:    util.BuildTrailer(),
-		Owner:      owner,
-		Repository: repo,
-		Branch:     branch,
+		HasToken:      len(viper.GetString("token")) > 0,
+		Trailers:      util.BuildTrailers(),
+		Owner:         owner,
+		Repository:    repo,
+		Branch:        branch,
+		CommitMessage: remote.CommitMessage(util.BuildCommitMessage()),
 	}
 
 	if localRepo != nil {
@@ -49,11 +52,6 @@ func runInfoCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	m, err := yaml.Marshal(i)
-	if err != nil {
-		return err
-	}
-
-	fmt.Print(string(m))
+	fmt.Print(util.EncodeYAML(&i))
 	return
 }

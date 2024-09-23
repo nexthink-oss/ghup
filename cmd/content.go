@@ -25,33 +25,33 @@ var contentCmd = &cobra.Command{
 }
 
 func init() {
-	contentCmd.PersistentFlags().Bool("create-branch", true, "create missing target branch")
-	viper.BindPFlag("create-branch", contentCmd.PersistentFlags().Lookup("create-branch"))
+	contentCmd.Flags().Bool("create-branch", true, "create missing target branch")
+	viper.BindPFlag("create-branch", contentCmd.Flags().Lookup("create-branch"))
 	viper.BindEnv("create-branch", "GHUP_CREATE_BRANCH")
 
-	contentCmd.PersistentFlags().String("pr-title", "", "create pull request iff target branch is created and title is specified")
-	viper.BindPFlag("pr-title", contentCmd.PersistentFlags().Lookup("pr-title"))
+	contentCmd.Flags().String("pr-title", "", "create pull request iff target branch is created and title is specified")
+	viper.BindPFlag("pr-title", contentCmd.Flags().Lookup("pr-title"))
 	viper.BindEnv("pr-title", "GHUP_PR_TITLE")
 
-	contentCmd.PersistentFlags().String("pr-body", "", "pull request body")
-	viper.BindPFlag("pr-body", contentCmd.PersistentFlags().Lookup("pr-body"))
+	contentCmd.Flags().String("pr-body", "", "pull request body")
+	viper.BindPFlag("pr-body", contentCmd.Flags().Lookup("pr-body"))
 	viper.BindEnv("pr-body", "GHUP_PR_BODY")
 
-	contentCmd.PersistentFlags().Bool("pr-draft", false, "create pull request in draft mode")
-	viper.BindPFlag("pr-draft", contentCmd.PersistentFlags().Lookup("pr-draft"))
+	contentCmd.Flags().Bool("pr-draft", false, "create pull request in draft mode")
+	viper.BindPFlag("pr-draft", contentCmd.Flags().Lookup("pr-draft"))
 	viper.BindEnv("pr-draft", "GHUP_PR_DRAFT")
 
-	contentCmd.PersistentFlags().String("base-branch", "", `base branch name (default: "[remote-default-branch])"`)
-	viper.BindPFlag("base-branch", contentCmd.PersistentFlags().Lookup("base-branch"))
+	contentCmd.Flags().String("base-branch", "", `base branch `+"`name`"+` (default: "[remote-default-branch])"`)
+	viper.BindPFlag("base-branch", contentCmd.Flags().Lookup("base-branch"))
 	viper.BindEnv("base-branch", "GHUP_BASE_BRANCH")
 
 	contentCmd.Flags().StringP("separator", "s", ":", "file-spec separator")
 	viper.BindPFlag("separator", contentCmd.Flags().Lookup("separator"))
 
-	contentCmd.Flags().StringSliceP("update", "u", []string{}, "file-spec to update")
+	contentCmd.Flags().StringSliceP("update", "u", []string{}, "`file-spec` to update")
 	viper.BindPFlag("update", contentCmd.Flags().Lookup("update"))
 
-	contentCmd.Flags().StringSliceP("delete", "d", []string{}, "file-path to delete")
+	contentCmd.Flags().StringSliceP("delete", "d", []string{}, "`file-path` to delete")
 	viper.BindPFlag("delete", contentCmd.Flags().Lookup("delete"))
 
 	contentCmd.Flags().SortFlags = false
@@ -172,7 +172,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 	log.Debugf("CreateCommitOnBranchInput: %+v", input)
 
-	_, commitUrl, err := client.CommitOnBranchV4(input)
+	_, commitUrl, err := client.CreateCommitOnBranchV4(input)
 	if err != nil {
 		return errors.Wrap(err, "CommitOnBranchV4")
 	}
