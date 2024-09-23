@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/apex/log"
@@ -16,25 +17,30 @@ import (
 )
 
 type sRef struct {
-	Ref string `yaml:"ref"`
-	SHA string `yaml:"sha"`
+	Ref string `json:"ref"`
+	SHA string `json:"sha"`
 }
 
 type tRef struct {
-	Ref     string `yaml:"ref"`
-	Updated bool   `yaml:"updated"`
-	OldSHA  string `yaml:"old_sha,omitempty"`
-	SHA     string `yaml:"sha,omitempty"`
-	Error   string `yaml:"error,omitempty"`
+	Ref     string `json:"ref"`
+	Updated bool   `json:"updated"`
+	OldSHA  string `json:"old_sha,omitempty"`
+	SHA     string `json:"sha,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 type report struct {
-	Source sRef   `yaml:"source"`
-	Target []tRef `yaml:"target"`
+	Source sRef   `json:"source"`
+	Target []tRef `json:"target"`
 }
 
 func (r report) String() string {
-	return util.EncodeYAML(&r)
+	m, err := json.Marshal(r)
+	if err != nil {
+		log.Error(errors.Wrap(err, "json.Marshal").Error())
+		return ""
+	}
+	return string(m)
 }
 
 var updateRefCmd = &cobra.Command{

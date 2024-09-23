@@ -1,162 +1,139 @@
 package util
 
 import (
+	"os"
 	"slices"
 	"testing"
 
 	"github.com/spf13/viper"
 )
 
-func TestCoalesce(t *testing.T) {
+func TestGithubActionsBranch(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []string
-		expected string
+		name           string
+		envVars        map[string]string
+		expectedBranch string
 	}{
 		{
-			name:     "No arguments",
-			input:    []string{},
-			expected: "",
+			name: "PR context",
+			envVars: map[string]string{
+				"GITHUB_REF_TYPE": "branch",
+				"GITHUB_HEAD_REF": "feature-branch",
+				"GITHUB_REF_NAME": "7/merge",
+			},
+			expectedBranch: "feature-branch",
 		},
 		{
-			name:     "All empty strings",
-			input:    []string{"", "", ""},
-			expected: "",
+			name: "Other context",
+			envVars: map[string]string{
+				"GITHUB_REF_TYPE": "branch",
+				"GITHUB_HEAD_REF": "",
+				"GITHUB_REF_NAME": "main",
+			},
+			expectedBranch: "main",
 		},
 		{
-			name:     "Mixed empty and non-empty strings",
-			input:    []string{"", "first", "", "second"},
-			expected: "first",
-		},
-		{
-			name:     "All non-empty strings",
-			input:    []string{"first", "second", "third"},
-			expected: "first",
+			name: "Not a branch",
+			envVars: map[string]string{
+				"GITHUB_REF_TYPE": "tag",
+				"GITHUB_REF_NAME": "v1.0.0",
+			},
+			expectedBranch: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := Coalesce(tt.input...)
-			if result != tt.expected {
-				t.Errorf("Coalesce(%v) = %v; expected %v", tt.input, result, tt.expected)
+			for key, value := range tt.envVars {
+				os.Setenv(key, value)
+			}
+
+			result := GithubActionsBranch()
+			if result != tt.expectedBranch {
+				t.Errorf("GithubActionsBranch() = %v; expected %v", result, tt.expectedBranch)
+			}
+
+			for key := range tt.envVars {
+				os.Unsetenv(key)
 			}
 		})
 	}
 }
 
-func TestEncodeYAML(t *testing.T) {
+func TestGithubActionsContext(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          any
-		expectedOutput string
+		name            string
+		envVars         map[string]string
+		expectedContext *RepositoryContext
 	}{
 		{
-			name:           "Empty struct",
-			input:          struct{}{},
-			expectedOutput: "{}\n",
-		},
-		{
-			name: "Simple struct",
-			input: struct {
-				Name  string `yaml:"name"`
-				Value int    `yaml:"value"`
-			}{
-				Name:  "test",
-				Value: 42,
+			name: "Valid context",
+			envVars: map[string]string{
+				"GITHUB_REPOSITORY": "owner/repo",
+				"GITHUB_REF_TYPE":   "branch",
+				"GITHUB_REF_NAME":   "main",
 			},
-			expectedOutput: "name: test\nvalue: 42\n",
-		},
-		{
-			name: "Nested struct",
-			input: struct {
-				Name  string `yaml:"name"`
-				Inner struct {
-					Field1 string `yaml:"field1"`
-					Field2 int    `yaml:"field2"`
-				} `yaml:"inner"`
-			}{
-				Name: "outer",
-				Inner: struct {
-					Field1 string `yaml:"field1"`
-					Field2 int    `yaml:"field2"`
-				}{
-					Field1: "inner value",
-					Field2: 99,
-				},
+			expectedContext: &RepositoryContext{
+				Owner:  "owner",
+				Name:   "repo",
+				Branch: "main",
 			},
-			expectedOutput: "name: outer\ninner:\n  field1: inner value\n  field2: 99\n",
 		},
 		{
-			name: "Map input",
-			input: map[string]interface{}{
-				"key1": "value1",
-				"key2": 123,
+			name: "PR context",
+			envVars: map[string]string{
+				"GITHUB_REPOSITORY": "owner/repo",
+				"GITHUB_REF_TYPE":   "branch",
+				"GITHUB_HEAD_REF":   "feature-branch",
+				"GITHUB_REF_NAME":   "1/merge",
 			},
-			expectedOutput: "key1: value1\nkey2: 123\n",
-		},
-		{
-			name:           "Slice input",
-			input:          []string{"item1", "item2", "item3"},
-			expectedOutput: "- item1\n- item2\n- item3\n",
-		},
-		{
-			name: "Nested struct with expected indentation",
-			input: struct {
-				Level1 struct {
-					Level2 struct {
-						Level3 string `yaml:"level3"`
-					} `yaml:"level2"`
-				} `yaml:"level1"`
-			}{
-				Level1: struct {
-					Level2 struct {
-						Level3 string `yaml:"level3"`
-					} `yaml:"level2"`
-				}{
-					Level2: struct {
-						Level3 string `yaml:"level3"`
-					}{
-						Level3: "deep value",
-					},
-				},
+			expectedContext: &RepositoryContext{
+				Owner:  "owner",
+				Name:   "repo",
+				Branch: "feature-branch",
 			},
-			expectedOutput: "level1:\n  level2:\n    level3: deep value\n",
 		},
 		{
-			name: "Nested list elements",
-			input: struct {
-				Level1 struct {
-					List []struct {
-						Item1 string `yaml:"item1"`
-						Item2 int    `yaml:"item2"`
-					} `yaml:"list"`
-				} `yaml:"level1"`
-			}{
-				Level1: struct {
-					List []struct {
-						Item1 string `yaml:"item1"`
-						Item2 int    `yaml:"item2"`
-					} `yaml:"list"`
-				}{
-					List: []struct {
-						Item1 string `yaml:"item1"`
-						Item2 int    `yaml:"item2"`
-					}{
-						{Item1: "value1", Item2: 1},
-						{Item1: "value2", Item2: 2},
-					},
-				},
+			name: "Tag context",
+			envVars: map[string]string{
+				"GITHUB_REPOSITORY": "owner/repo",
+				"GITHUB_REF_TYPE":   "tag",
+				"GITHUB_HEAD_REF":   "",
+				"GITHUB_REF_NAME":   "v1.0.0",
 			},
-			expectedOutput: "level1:\n  list:\n    - item1: value1\n      item2: 1\n    - item1: value2\n      item2: 2\n",
+			expectedContext: &RepositoryContext{
+				Owner:  "owner",
+				Name:   "repo",
+				Branch: "",
+			},
+		},
+		{
+			name: "No repository",
+			envVars: map[string]string{
+				"GITHUB_REF_TYPE": "branch",
+				"GITHUB_REF_NAME": "main",
+			},
+			expectedContext: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := EncodeYAML(tt.input)
-			if result != tt.expectedOutput {
-				t.Errorf("EncodeYAML() = %v; expected %v", result, tt.expectedOutput)
+			for key, value := range tt.envVars {
+				os.Setenv(key, value)
+			}
+
+			result := GithubActionsContext()
+			if (result == nil && tt.expectedContext != nil) || (result != nil && tt.expectedContext == nil) {
+				t.Errorf("GithubActionsContext() = %v; expected %v", result, tt.expectedContext)
+			} else if result != nil && tt.expectedContext != nil {
+				if result.Owner != tt.expectedContext.Owner || result.Name != tt.expectedContext.Name || result.Branch != tt.expectedContext.Branch {
+					t.Errorf("GithubActionsContext() = %v; expected %v", result, tt.expectedContext)
+				}
+			}
+
+			for key := range tt.envVars {
+				os.Unsetenv(key)
 			}
 		})
 	}

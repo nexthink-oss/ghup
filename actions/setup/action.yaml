@@ -1,0 +1,14 @@
+name: ghup/setup
+description: "Setup ghup from GitHub Releases or cache"
+author: "Nexthink"
+inputs:
+  version:
+    description: "Version of ghup to install"
+    required: false
+    default: "latest"
+outputs:
+  version:
+    description: "Version of ghup installed"
+runs:
+  using: "node20"
+  main: "dist/index.js"
