@@ -56,6 +56,10 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	branchRefName := fmt.Sprintf("heads/%s", branch)
 
 	tagRefName := fmt.Sprintf("tags/%s", tagName)
+	if err := util.IsValidRefName(tagRefName); err != nil {
+		return errors.Wrapf(err, "Invalid tag reference: %s", tagRefName)
+	}
+
 	var tagRefObject string
 
 	log.Infof("getting tag reference: %s", tagRefName)

@@ -9,7 +9,7 @@ A GitHub API client for managing tags and repository content from third-party au
 
 * Create and update tags, both lightweight and annotated.
 * Add, update and delete content idempotently.
-* Idempotent ref copying (e.g. fast-forward merge and mutable tag updates).
+* Idempotent update of git refs (e.g. fast-forward merge and mutable tags).
 * GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
 * Configuration defaults inferred from local context (e.g. git clone and environment).
 * Completely self-contained: no external dependencies.
@@ -80,7 +80,7 @@ Unless `--force` is used, content that already matches the remote repository sta
 
 Note: Due to limitations in the GitHub V4 API, when the target branch does not exist, branch creation and content push will trigger two distinct "push" events.
 
-#### Content Example
+#### Content Examples
 
 ##### Idempotent file add/update
 
@@ -137,7 +137,7 @@ Global Flags:
   -v, --verbosity count          verbosity
 ```
 
-#### Tagging Example
+#### Tagging Examples
 
 ##### Create lightweight tag
 
@@ -157,47 +157,49 @@ $ ghup -o nexthink-oss -r ghup -b main tag v1.0 -m "Release v1.0!"
 https://github.com/nexthink-oss/ghup/releases/tag/v1.0
 ```
 
-### Ref Copying
+### Update Refs
 
-The `ref` verb is used to update an arbitrary number `head` or `tag` references to match a source reference.
+The `update-ref` verb is used to update an arbitrary number `head` or `tag` references to match a source reference.
 
-The `source_ref` may take the form of a partial commit hash, or of a fully- or partially-qualified reference, defaulting to a branch reference (`heads/…`; overrideable via `--source-type=tags`).
-The `target_ref`(s) must take the form of fully- or partially-qualified references, defaulting to tag references, defaulting to tag references (`tags/…`; overrideable via `--target-type=heads`). The `--force` flag will override standard fast-forward-only protection on branch updates.
+The `source` may take the form of a partial commit hash, or of a fully- or partially-qualified reference, defaulting to a branch reference (`heads/…`; overrideable via `--source-type=tags`).
+The `target`(s) must take the form of fully- or partially-qualified references, defaulting to tag references, defaulting to tag references (`tags/…`; overrideable via `--target-type=heads`).
+The `--force` flag will override standard fast-forward-only protection on branch updates.
 
 ```console
-$ ghup ref --help
-Update target_refs to match source_ref
+$ ghup update-ref --help
+Update target refs to match source
 
 Usage:
-  ghup ref [flags] <source_ref> <target_ref>...
+  ghup update-ref [flags] -s <source> <target> ...
 
 Flags:
-  -S, --source-type string   default source ref type (choices: [heads, tags]) (default "heads")
-  -T, --target-type string   default target ref type (choices: [tags, heads]) (default "tags")
-  -h, --help                 help for ref
+  -s, --source ref-or-commit     source ref-or-commit
+  -S, --source-type heads|tags   unqualified source ref type (default heads)
+  -T, --target-type heads|tags   unqualified target ref type (default tags)
+  -h, --help                     help for update-ref
 
 Global Flags:
-      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch string            target branch name (default "feature/ref")
-  -f, --force                    force action
-  -m, --message string           message (default "Commit via API")
-  -o, --owner string             repository owner (default "isometry")
-  -r, --repo string              repository name (default "ghup")
-      --token string             GitHub Token or path/to/token-file
-      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
-      --user.email string        email for commit author trailer (default "robin@isometry.net")
-      --user.name string         name for commit author trailer (default "Robin Breathe")
-  -v, --verbosity count          verbosity
+      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch name          target branch name (default "feature/ref")
+  -f, --force                force action
+  -m, --message string       message (default "Commit via API")
+  -o, --owner name           repository owner name (default "isometry")
+  -r, --repo name            repository name (default "ghup")
+      --token string         GitHub Token or path/to/token-file
+      --trailer key=value    extra key=value commit trailers (default [])
+      --user.email email     email for commit author trailer (default "robin.breathe@nexthink.com")
+      --user.name name       name for commit author trailer (default "Robin Breathe")
+  -v, --verbosity count      verbosity
 ```
 
-Note: the `--branch`, `--message` and `--trailer.*` flags are not used by the `ref` verb.
+Note: the `--branch`, `--message` and trailer-related flags are not used by the `ref` verb.
 
-#### Ref Copying Example
+#### Updated Refs Examples
 
 ##### Fast-forward production branch to match staging
 
 ```console
-$ ghup ref staging heads/production
+$ ghup update-ref -s staging heads/production
 source:
   ref: heads/staging
   sha: 206e1a484f03cd320a2125a50aa73bd8a2b045dc
@@ -211,7 +213,7 @@ target:
 ##### Create a lightweight tag pointing at a specific commit
 
 ```console
-$ ghup ref b7ccc4d example
+$ ghup update-ref -s b7ccc4d example
 source:
   ref: b7ccc4d
   sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
@@ -224,7 +226,7 @@ target:
 ##### Update GitHub Actions-style major and minor tags following patch release:
 
 ```console
-$ ghup ref tags/v1.1.7 v1.1 v1
+$ ghup update-ref -s tags/v1.1.7 v1.1 v1
 source:
   ref: tags/v1.1.7
   sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4

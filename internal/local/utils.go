@@ -16,9 +16,15 @@ func GetLocalFileContent(arg string, separator string) (target string, content [
 	case len(files) < 1:
 		err = fmt.Errorf("invalid file parameter")
 		return
+	case files[0] == "":
+		err = fmt.Errorf("no source file specified")
+		return
 	case len(files) == 1:
 		source = files[0]
 		target = files[0]
+	case files[1] == "":
+		err = fmt.Errorf("no target file specified")
+		return
 	default:
 		source = files[0]
 		target = files[1]

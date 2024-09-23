@@ -7,8 +7,8 @@ import (
 
 // ChoiceFlag is a custom flag type for limited choice options
 type ChoiceFlag struct {
-	value   string
 	choices []string
+	value   string
 }
 
 // String returns the string representation of the flag value
@@ -29,13 +29,12 @@ func (c *ChoiceFlag) Set(value string) error {
 
 // Type returns the type of the flag
 func (e *ChoiceFlag) Type() string {
-	return "string"
+	return strings.Join(e.choices, "|")
 }
 
 // NewChoiceFlag creates a new ChoiceFlag with the given choices
 func NewChoiceFlag(choices []string) *ChoiceFlag {
 	return &ChoiceFlag{
-		value:   choices[0],
 		choices: choices,
 	}
 }

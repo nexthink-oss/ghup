@@ -72,39 +72,40 @@ func init() {
 	viper.BindPFlag("token", rootCmd.PersistentFlags().Lookup("token"))
 	viper.BindEnv("token", "GHUP_TOKEN", "GITHUB_TOKEN")
 
-	rootCmd.PersistentFlags().StringP("owner", "o", defaultOwner, "repository owner")
+	rootCmd.PersistentFlags().StringP("owner", "o", defaultOwner, "repository owner `name`")
 	viper.BindPFlag("owner", rootCmd.PersistentFlags().Lookup("owner"))
 	viper.BindEnv("owner", "GHUP_OWNER", "GITHUB_OWNER")
 
-	rootCmd.PersistentFlags().StringP("repo", "r", defaultRepo, "repository name")
+	rootCmd.PersistentFlags().StringP("repo", "r", defaultRepo, "repository `name`")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
 
-	rootCmd.PersistentFlags().StringP("branch", "b", defaultBranch, "target branch name")
+	rootCmd.PersistentFlags().StringP("branch", "b", defaultBranch, "target branch `name`")
 	viper.BindPFlag("branch", rootCmd.PersistentFlags().Lookup("branch"))
 	viper.BindEnv("branch", "GHUP_BRANCH", "CHANGE_BRANCH", "BRANCH_NAME", "GIT_BRANCH")
 
 	rootCmd.PersistentFlags().StringP("message", "m", "Commit via API", "message")
 	viper.BindPFlag("message", rootCmd.PersistentFlags().Lookup("message"))
 
-	rootCmd.PersistentFlags().String("author.trailer", "Co-Authored-By", "key for commit author trailer (blank to disable)")
+	rootCmd.PersistentFlags().String("author.trailer", "Co-Authored-By", "`key` for commit author trailer (blank to disable)")
 	viper.BindPFlag("author.trailer", rootCmd.PersistentFlags().Lookup("author.trailer"))
 	viper.BindEnv("author.trailer", "GHUP_TRAILER_KEY")
 
-	rootCmd.PersistentFlags().String("user.name", defaultUserName, "name for commit author trailer")
+	rootCmd.PersistentFlags().String("user.name", defaultUserName, "`name` for commit author trailer")
 	viper.BindPFlag("user.name", rootCmd.PersistentFlags().Lookup("user.name"))
 	viper.BindEnv("user.name", "GHUP_TRAILER_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_NAME")
 
-	rootCmd.PersistentFlags().String("user.email", defaultUserEmail, "email for commit author trailer")
+	rootCmd.PersistentFlags().String("user.email", defaultUserEmail, "`email` for commit author trailer")
 	viper.BindPFlag("user.email", rootCmd.PersistentFlags().Lookup("user.email"))
 	viper.BindEnv("user.email", "GHUP_TRAILER_EMAIL", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL")
 
-	rootCmd.PersistentFlags().StringToString("trailer", nil, "additional commit trailer (key=value; JSON via environment)")
+	rootCmd.PersistentFlags().StringToString("trailer", nil, "extra `key=value` commit trailers")
 	viper.BindPFlag("trailer", rootCmd.PersistentFlags().Lookup("trailer"))
 
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "force action")
 	viper.BindPFlag("force", rootCmd.PersistentFlags().Lookup("force"))
 
 	rootCmd.Flags().SortFlags = false
+	rootCmd.PersistentFlags().SortFlags = false
 }
 
 // initViper initializes Viper to load config from the environment
