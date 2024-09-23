@@ -41,35 +41,34 @@ An arbitrary number of content adds, removes and deletes can be committed withou
 
 ```console
 $ ghup content --help
-
 Manage content via the GitHub V4 API
 
 Usage:
   ghup content [flags] [<file-spec> ...]
 
 Flags:
-      --base-branch string   base branch name (default: "[remote-default-branch]")
-      --create-branch        create missing target branch (default true)
-  -d, --delete strings       file-path to delete
-  -h, --help                 help for content
-      --pr-body string       pull request description body
-      --pr-draft             create pull request in draft mode
-      --pr-title string      create pull request iff target branch is created and title is specified
-  -s, --separator string     file-spec separator (default ":")
-  -u, --update strings       file-spec to update
+      --create-branch      create missing target branch (default true)
+      --pr-title string    create pull request iff target branch is created and title is specified
+      --pr-body string     pull request body
+      --pr-draft           create pull request in draft mode
+      --base-branch name   base branch name (default: "[remote-default-branch])"
+  -s, --separator string   file-spec separator (default ":")
+  -u, --update file-spec   file-spec to update
+  -d, --delete file-path   file-path to delete
+  -h, --help               help for content
 
 Global Flags:
-      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch string            target branch name (default "feature/ref")
-  -f, --force                    force action
-  -m, --message string           message (default "Commit via API")
-  -o, --owner string             repository owner (default "isometry")
-  -r, --repo string              repository name (default "ghup")
-      --token string             GitHub Token or path/to/token-file
-      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
-      --user.email string        email for commit author trailer (default "robin@isometry.net")
-      --user.name string         name for commit author trailer (default "Robin Breathe")
-  -v, --verbosity count          verbosity
+      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch name          target branch name (default "[local-branch-or-main]")
+  -f, --force                force action
+  -m, --message string       message (default "Commit via API")
+  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string         GitHub Token or path/to/token-file
+      --trailer key=value    extra key=value commit trailers (default [])
+      --user.email email     email for commit author trailer (default "[user.email]")
+      --user.name name       name for commit author trailer (default "[user.name]")
+  -v, --verbosity count      verbosity
 ```
 
 Each `file-spec` provided as a positional argument or explicitly via the `--update` flag takes the form `<local-file-path>[:<remote-target-path>]`. Content is read from the local file `<local-file-path>` and written to `<remote-target-path>` (defaulting to `<local-file-path>` if not specified).
@@ -124,17 +123,17 @@ Flags:
       --tag string    tag name
 
 Global Flags:
-      --author.trailer string    key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch string            target branch name (default "feature/ref")
-  -f, --force                    force action
-  -m, --message string           message (default "Commit via API")
-  -o, --owner string             repository owner (default "isometry")
-  -r, --repo string              repository name (default "ghup")
-      --token string             GitHub Token or path/to/token-file
-      --trailer stringToString   additional commit trailer (key=value; JSON via environment) (default [])
-      --user.email string        email for commit author trailer (default "robin@isometry.net")
-      --user.name string         name for commit author trailer (default "Robin Breathe")
-  -v, --verbosity count          verbosity
+      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
+  -b, --branch name          target branch name (default "[local-branch-or-main]")
+  -f, --force                force action
+  -m, --message string       message (default "Commit via API")
+  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
+      --token string         GitHub Token or path/to/token-file
+      --trailer key=value    extra key=value commit trailers (default [])
+      --user.email email     email for commit author trailer (default "[user.email]")
+      --user.name name       name for commit author trailer (default "[user.name]")
+  -v, --verbosity count      verbosity
 ```
 
 #### Tagging Examples
@@ -180,15 +179,15 @@ Flags:
 
 Global Flags:
       --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch name          target branch name (default "feature/ref")
+  -b, --branch name          target branch name (default "[local-branch-or-main]")
   -f, --force                force action
   -m, --message string       message (default "Commit via API")
-  -o, --owner name           repository owner name (default "isometry")
-  -r, --repo name            repository name (default "ghup")
+  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
+  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
       --token string         GitHub Token or path/to/token-file
       --trailer key=value    extra key=value commit trailers (default [])
-      --user.email email     email for commit author trailer (default "robin.breathe@nexthink.com")
-      --user.name name       name for commit author trailer (default "Robin Breathe")
+      --user.email email     email for commit author trailer (default "[user.email]")
+      --user.name name       name for commit author trailer (default "[user.name]")
   -v, --verbosity count      verbosity
 ```
 
