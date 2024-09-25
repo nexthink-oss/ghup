@@ -1,0 +1,26 @@
+name: ghup/fast-forward
+description: "Fast-forward target ref to source"
+author: "Nexthink"
+inputs:
+  source:
+    description: "Source ref-or-commit HEAD"
+    required: true
+  target:
+    description: "Refs to fast-forward to match source (newline-separated)"
+    required: true
+  force:
+    description: "Force push to target"
+    required: false
+    default: "false"
+  version:
+    description: "Version of ghup to use"
+    required: false
+    default: "latest"
+outputs:
+  source:
+    description: "Resolved source details"
+  target:
+    description: "Updated target details"
+runs:
+  using: "node20"
+  main: "dist/index.js"

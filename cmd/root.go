@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"strings"
@@ -56,6 +57,17 @@ func init() {
 		os.Exit(99)
 	}
 
+	// inherit defaults from GitHub Actions environment variables
+	// in case we're running without a checkout
+	if context := util.GithubActionsContext(); context != nil {
+		defaultOwner = context.Owner
+		defaultRepo = context.Name
+		if context.Branch != "" {
+			defaultBranch = context.Branch
+		}
+	}
+
+	// set defaults from local repository context, if available
 	localRepo = local.GetRepository(cwd)
 	if localRepo != nil {
 		defaultUserName = localRepo.UserName
@@ -74,7 +86,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringP("owner", "o", defaultOwner, "repository owner `name`")
 	viper.BindPFlag("owner", rootCmd.PersistentFlags().Lookup("owner"))
-	viper.BindEnv("owner", "GHUP_OWNER", "GITHUB_OWNER")
+	viper.BindEnv("owner", "GHUP_OWNER", "GITHUB_OWNER", "GITHUB_REPOSITORY_OWNER")
 
 	rootCmd.PersistentFlags().StringP("repo", "r", defaultRepo, "repository `name`")
 	viper.BindPFlag("repo", rootCmd.PersistentFlags().Lookup("repo"))
@@ -126,17 +138,17 @@ func initLogger() {
 
 // validateFlags checks mandatory flags are valid and stores results in shared variables
 func validateFlags(cmd *cobra.Command, args []string) error {
-	owner = util.Coalesce(viper.GetString("owner"), defaultOwner)
+	owner = cmp.Or[string](viper.GetString("owner"), defaultOwner)
 	if owner == "" {
 		return fmt.Errorf("no owner specified")
 	}
 
-	repo = util.Coalesce(viper.GetString("repo"), defaultRepo)
+	repo = cmp.Or[string](viper.GetString("repo"), defaultRepo)
 	if repo == "" {
 		return fmt.Errorf("no repo specified")
 	}
 
-	branch = util.Coalesce(viper.GetString("branch"), defaultBranch)
+	branch = cmp.Or[string](viper.GetString("branch"), defaultBranch)
 	if branch == "" {
 		return fmt.Errorf("no branch specified")
 	}

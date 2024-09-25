@@ -1,43 +1,53 @@
 package util
 
 import (
-	"bytes"
+	"cmp"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
-// Coalesce returns the first not empty string
-func Coalesce(values ...string) (value string) {
-	for _, value = range values {
-		if value != "" {
-			return
-		}
+type RepositoryContext struct {
+	Owner  string
+	Name   string
+	Branch string
+}
+
+// GithubActionsBranch returns the branch name if running in a GitHub Actions environment, or an empty string
+func GithubActionsBranch() (branch string) {
+	if os.Getenv("GITHUB_REF_TYPE") == "branch" {
+		branch = cmp.Or[string](
+			os.Getenv("GITHUB_HEAD_REF"), // PR context
+			os.Getenv("GITHUB_REF_NAME"), // other contexts
+		)
 	}
 	return
 }
 
-func EncodeYAML(obj any) string {
-	var b bytes.Buffer
-
-	e := yaml.NewEncoder(&b)
-	e.SetIndent(2)
-
-	_ = e.Encode(obj)
-
-	return b.String()
+// GithubActionsContext returns repository context if running in a GitHub Actions environment
+func GithubActionsContext() *RepositoryContext {
+	if owner, name, found := strings.Cut(os.Getenv("GITHUB_REPOSITORY"), "/"); found {
+		return &RepositoryContext{
+			Owner:  owner,
+			Name:   name,
+			Branch: GithubActionsBranch(),
+		}
+	}
+	return nil
 }
 
+// IsCommitHash returns true if the ref looks like a commit hash
 func IsCommitHash(ref string) bool {
 	commitHashPattern := `^[0-9a-f]{7,40}$`
 	matched, _ := regexp.MatchString(commitHashPattern, ref)
 	return matched
 }
 
+// IsValidRefName checks if the ref name matches git ref requirements
 func IsValidRefName(refName string) error {
 	if refName == "" {
 		return fmt.Errorf("empty ref name")
@@ -90,6 +100,7 @@ func IsValidRefName(refName string) error {
 	return nil
 }
 
+// NormalizeRefName normalizes the ref name to match GitHub's expectations for the CreateRef/UpdateRef APIs
 func NormalizeRefName(refName string, defaultRefType string) (string, error) {
 	if err := IsValidRefName(refName); err != nil {
 		return "", err
@@ -105,6 +116,7 @@ func NormalizeRefName(refName string, defaultRefType string) (string, error) {
 	return refName, nil
 }
 
+// BuildCommitMessage generates a commit message from the message and trailers configuration
 func BuildCommitMessage() (message string) {
 	messageParts := []string{}
 	if message := viper.GetString("message"); message != "" {
@@ -121,6 +133,7 @@ func BuildCommitMessage() (message string) {
 	return
 }
 
+// BuildTrailers generates the complete list of trailers from the configuration
 func BuildTrailers() (trailers []string) {
 	if trailerKey := viper.GetString("author.trailer"); trailerKey != "" && trailerKey != "-" {
 		var userParts []string

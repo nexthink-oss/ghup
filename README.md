@@ -28,9 +28,34 @@ If run outside a GitHub repository, then the `--owner` and `--repo` flags are re
 
 All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_AUTHOR_TRAILER`, etc.
 
-In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_OWNER`, `GITHUB_TOKEN`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
+In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
+
+The environment variable `GITHUB_REPOSITORY`, always set in GitHub Actions workflow context in the form `<owner>/<repo>`, is only used to set initial defaults for `--owner` and `--repo`, but will be overridden by local repository context and more specific configuration.
+If `GITHUB_REPOSITORY` is set, then `--branch` will also default from `GITHUB_HEAD_REF` in pull request context, or `GITHUB_REF_NAME` otherwise.
 
 For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/token-file`, `--token <(gh auth token)` or `export GHUP_TOKEN=/path/to/token-file ghup …`)
+
+## Installation
+
+### Generic
+
+Binaries for all supported platforms and architectures are available from [GitHub Releases](https://github.com/nexthink-oss/ghup/releases/latest).
+
+Alternatively, install to `$GOBIN` with a local Go toolchain:
+
+```sh
+go install github.com/nexthink-oss/ghup@latest
+```
+
+### Homebrew
+
+```sh
+brew install isometry/tap/ghup
+```
+
+### GitHub Actions
+
+The [`nexthink-oss/ghup/actions/setup`](actions/setup/) action is available to make the `ghup` tool available in GitHub Actions.
 
 ## Usage
 
@@ -199,43 +224,21 @@ Note: the `--branch`, `--message` and trailer-related flags are not used by the 
 
 ```console
 $ ghup update-ref -s staging heads/production
-source:
-  ref: heads/staging
-  sha: 206e1a484f03cd320a2125a50aa73bd8a2b045dc
-target:
-  - ref: heads/production
-    updated: true
-    old_sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
-    sha: 206e1a484f03cd320a2125a50aa73bd8a2b045dc
+{"source":{"ref":"heads/staging","sha":"206e1a484f03cd320a2125a50aa73bd8a2b045dc"},"target":[{"ref":"heads/production","updated":true,"old_sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4","sha":"206e1a484f03cd320a2125a50aa73bd8a2b045dc"}]}
 ```
 
 ##### Create a lightweight tag pointing at a specific commit
 
 ```console
 $ ghup update-ref -s b7ccc4d example
-source:
-  ref: b7ccc4d
-  sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
-target:
-  - ref: tags/example
-    updated: true
-    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+{"source":{"ref":"b7ccc4d","sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},"target":[{"ref":"tags/example","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"}]}
 ```
 
 ##### Update GitHub Actions-style major and minor tags following patch release:
 
 ```console
 $ ghup update-ref -s tags/v1.1.7 v1.1 v1
-source:
-  ref: tags/v1.1.7
-  sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
-target:
-  - ref: tags/v1.1
-    updated: true
-    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
-  - ref: tags/v1
-    updated: true
-    sha: b7ccc4db9bc43551fd3571c260869f4c69aa2fd4
+{"source":{"ref":"tags/v1.1.7","sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},"target":[{"ref":"tags/v1.1","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},{"ref":"tags/v1","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"}]}
 ```
 
 ### Debug Info
@@ -244,16 +247,19 @@ In order to better validate the configuration derived from context (working dire
 
 ```console
 $ ghup info
-hasToken: true
-trailers:
-  - 'Co-Authored-By: Example User <user@example.com>'
-owner: nexthink-oss
-repository: ghup
-branch: feature/branch
-commit: 5e1692253399bd9ea6077dba27e4cdc8a15b9720
-isClean: false
-commitMessage:
-  headline: Commit via API
-  body: |2-
-    Co-Authored-By: Example User <user@example.com>
+{
+  "has_token": true,
+  "owner": "nexthink-oss",
+  "repository": "ghup",
+  "branch": "feature/branch",
+  "commit": "5e1692253399bd9ea6077dba27e4cdc8a15b9720",
+  "clean": false,
+  "message": {
+    "headline": "Commit via API",
+    "body": "Co-Authored-By: Example User <user@example.com>"
+  }
+  "trailers": [
+    "Co-Authored-By: Example User <user@example.com>"
+  ],
+}
 ```
