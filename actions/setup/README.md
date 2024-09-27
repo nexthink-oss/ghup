@@ -40,7 +40,7 @@ jobs:
           version: v0.10.0 # default: latest
 
       - name: Build
-        runs: npm ci && npm run build
+        run: npm ci && npm run build
 
       - name: Idempotently commit updated artifacts
         env:
@@ -48,5 +48,5 @@ jobs:
           GHUP_BRANCH: ${{ github.head_ref }}
           GHUP_MESSAGE: "build: autobuild #${{ github.event.pull_request.number }}"
           GHUP_TRAILER: '{"Build-Logs": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}'
-        runs: ghup content dist/*
+        run: ghup content dist/*
 ```
