@@ -46,7 +46,6 @@ func (r report) String() string {
 var updateRefCmd = &cobra.Command{
 	Use:     "update-ref [flags] -s <source> <target> ...",
 	Short:   "Update target refs to match source",
-	Args:    cobra.MinimumNArgs(1),
 	PreRunE: validateFlags,
 	RunE:    runUpdateRefCmd,
 }
@@ -55,6 +54,8 @@ func init() {
 	updateRefCmd.Flags().StringP("source", "s", "", "source `ref-or-commit`")
 	updateRefCmd.MarkFlagRequired("source")
 	viper.BindPFlag("source", updateRefCmd.Flags().Lookup("source"))
+
+	viper.BindEnv("targets", "GHUP_TARGETS")
 
 	refTypes := []string{"heads", "tags"}
 
@@ -105,7 +106,16 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		sourceObject = sourceRef.Object.GetSHA()
 	}
 
-	targetRefNames := args
+	var targetRefNames []string
+	if len(args) > 0 {
+		targetRefNames = args
+	} else {
+		targetRefNames = viper.GetStringSlice("targets")
+	}
+
+	if len(targetRefNames) == 0 {
+		return errors.New("no target refs specified")
+	}
 
 	// ensure all target refs are properly qualified
 	for i, targetRefName := range targetRefNames {
