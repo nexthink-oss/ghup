@@ -52,7 +52,6 @@ var updateRefCmd = &cobra.Command{
 
 func init() {
 	updateRefCmd.Flags().StringP("source", "s", "", "source `ref-or-commit`")
-	updateRefCmd.MarkFlagRequired("source")
 	viper.BindPFlag("source", updateRefCmd.Flags().Lookup("source"))
 
 	viper.BindEnv("targets", "GHUP_TARGETS")
@@ -83,6 +82,10 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	sourceRefName := viper.GetString("source")
+	if sourceRefName == "" {
+		return errors.New("no source ref specified")
+	}
+
 	var sourceObject string
 
 	if util.IsCommitHash(sourceRefName) {
