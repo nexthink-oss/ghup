@@ -32,6 +32,12 @@ type RepositoryInfo struct {
 	TargetBranch  BranchInfo
 }
 
+type PullRequest struct {
+	Number int
+	Title  string
+	URL    string
+}
+
 type RepositoryInfoQuery struct {
 	Repository struct {
 		Id               githubv4.String
@@ -227,6 +233,48 @@ func (c *TokenClient) GetRefOidV4(owner string, repo string, refName string) (oi
 		err = fmt.Errorf("ref %q does not exist", refName)
 	}
 	return
+}
+
+func (c *TokenClient) GetOpenPullRequestV4(owner, repo, headBranch, baseBranch string) (*PullRequest, error) {
+	// TODO: technically we should be paginating here in case there are more than 99 cross-repository PRs
+	var query struct {
+		Repository struct {
+			PullRequests struct {
+				Nodes []struct {
+					Number            int
+					Title             string
+					URL               string
+					IsCrossRepository bool
+				}
+			} `graphql:"pullRequests(states: OPEN, baseRefName: $baseBranch, headRefName: $headBranch, first: 100)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":      githubv4.String(owner),
+		"repo":       githubv4.String(repo),
+		"baseBranch": githubv4.String(baseBranch),
+		"headBranch": githubv4.String(headBranch),
+	}
+
+	err := c.V4.Query(c.Context, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pr := range query.Repository.PullRequests.Nodes {
+		if pr.IsCrossRepository {
+			continue // ignore cross-repository PRs
+		}
+
+		return &PullRequest{
+			Number: pr.Number,
+			Title:  pr.Title,
+			URL:    pr.URL,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func (c *TokenClient) CreateRefV4(input githubv4.CreateRefInput) (err error) {
