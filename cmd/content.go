@@ -25,6 +25,7 @@ var contentCmd = &cobra.Command{
 }
 
 func init() {
+
 	contentCmd.Flags().Bool("create-branch", true, "create missing target branch")
 	viper.BindPFlag("create-branch", contentCmd.Flags().Lookup("create-branch"))
 	viper.BindEnv("create-branch", "GHUP_CREATE_BRANCH")
@@ -177,9 +178,21 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		return errors.Wrap(err, "CommitOnBranchV4")
 	}
 
-	if title := viper.GetString("pr-title"); newBranch && title != "" {
+	if title := viper.GetString("pr-title"); title != "" {
+		if !newBranch {
+			existingPR, err := client.GetOpenPullRequestV4(owner, repo, branch, baseBranch)
+			if err != nil {
+				return errors.Wrap(err, "GetOpenPullRequestV4")
+			}
+
+			if existingPR != nil {
+				log.Infof("existing pull request found: %s", existingPR.URL)
+				return nil
+			}
+		}
 		body := githubv4.String(viper.GetString("pr-body"))
 		log.Infof("opening pull request from %q to %q", branch, baseBranch)
+
 		input := githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.NodeID,
 			BaseRefName:  githubv4.String(baseBranch),
@@ -197,5 +210,6 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	} else {
 		fmt.Println(commitUrl)
 	}
+
 	return
 }

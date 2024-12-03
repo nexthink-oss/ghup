@@ -32,6 +32,12 @@ type RepositoryInfo struct {
 	TargetBranch  BranchInfo
 }
 
+type PullRequest struct {
+	Number int
+	Title  string
+	URL    string
+}
+
 type RepositoryInfoQuery struct {
 	Repository struct {
 		Id               githubv4.String
@@ -227,6 +233,43 @@ func (c *TokenClient) GetRefOidV4(owner string, repo string, refName string) (oi
 		err = fmt.Errorf("ref %q does not exist", refName)
 	}
 	return
+}
+
+func (c *TokenClient) GetOpenPullRequestV4(owner, repo, headRefName, baseRefName string) (*PullRequest, error) {
+	var query struct {
+		Repository struct {
+			PullRequests struct {
+				Nodes []struct {
+					Number int
+					Title  string
+					URL    string
+				}
+			} `graphql:"pullRequests(states: OPEN, headRefName: $headRefName, baseRefName: $baseRefName, first: 1)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":       githubv4.String(owner),
+		"repo":        githubv4.String(repo),
+		"headRefName": githubv4.String(headRefName),
+		"baseRefName": githubv4.String(baseRefName),
+	}
+
+	err := c.V4.Query(c.Context, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(query.Repository.PullRequests.Nodes) > 0 {
+		pr := query.Repository.PullRequests.Nodes[0]
+		return &PullRequest{
+			Number: pr.Number,
+			Title:  pr.Title,
+			URL:    pr.URL,
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func (c *TokenClient) CreateRefV4(input githubv4.CreateRefInput) (err error) {
