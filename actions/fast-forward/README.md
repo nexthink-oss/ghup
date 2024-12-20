@@ -12,7 +12,7 @@ It can be used, for example, to create/update tags or to implement true fast-for
 
 ### `target` input
 
-**Required** a newline-separated list of targets to update to the resolved source commit.
+**Required** a whitespace-separated list of targets to update to the resolved source commit.
 
 ### `force` input
 
