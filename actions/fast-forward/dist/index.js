@@ -34315,7 +34315,7 @@ async function main() {
     try {
         const inputs = {
             source: core.getInput('source', { required: true }),
-            target: core.getMultilineInput('target', { required: true }),
+            target: core.getInput('target', { required: true }),
             force: core.getBooleanInput('force') || false,
             version: core.getInput('version') || 'latest'
         };
@@ -34338,7 +34338,8 @@ async function main() {
             ghupPath = await tc.cacheFile(`${extractPath}/ghup`, 'ghup', 'ghup', version);
         }
         core.addPath(ghupPath);
-        const output = await exec.getExecOutput('ghup', ['update-ref', `--force=${inputs.force}`, '--source', inputs.source, ...inputs.target]);
+        const targets = inputs.target.split(/\s+/);
+        const output = await exec.getExecOutput('ghup', ['update-ref', `--force=${inputs.force}`, '--source', inputs.source, ...targets]);
         if (output.stderr) {
             await core.group(`Errors`, async () => {
                 core.error(output.stderr);
