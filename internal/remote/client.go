@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v64/github"
+	"github.com/google/go-github/v68/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )

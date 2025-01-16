@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nexthink-oss/ghup/internal/remote"
-	"github.com/nexthink-oss/ghup/internal/util"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/nexthink-oss/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/util"
 )
 
 type info struct {
