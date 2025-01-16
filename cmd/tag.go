@@ -6,8 +6,7 @@ import (
 	"net/http"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v64/github"
-	"github.com/pkg/errors"
+	"github.com/google/go-github/v68/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -40,7 +39,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 
 	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
 	if err != nil {
-		return errors.Wrap(err, "NewTokenClient")
+		return fmt.Errorf("NewTokenClient: %w", err)
 	}
 
 	tagName := viper.GetString("tag")
@@ -57,15 +56,15 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 
 	tagRefName := fmt.Sprintf("tags/%s", tagName)
 	if err := util.IsValidRefName(tagRefName); err != nil {
-		return errors.Wrapf(err, "Invalid tag reference: %s", tagRefName)
+		return fmt.Errorf("Invalid tag reference: %s: %w", tagRefName, err)
 	}
 
 	var tagRefObject string
 
 	log.Infof("getting tag reference: %s", tagRefName)
 	existingTagRef, resp, err := client.V3.Git.GetRef(ctx, owner, repo, tagRefName)
-	if err != nil && (resp == nil || (resp != nil && resp.StatusCode != http.StatusNotFound)) {
-		return errors.Wrap(err, "GetRef")
+	if err != nil && (resp == nil || resp.StatusCode != http.StatusNotFound) {
+		return fmt.Errorf("GetRef: %w", err)
 	} else if err == nil && !viper.GetBool("force") {
 		return fmt.Errorf("tag '%s' already exists: %s", tagName, *existingTagRef.Object.SHA)
 	}
@@ -73,7 +72,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	log.Infof("getting branch reference: %s", branchRefName)
 	branchRef, _, err := client.V3.Git.GetRef(ctx, owner, repo, branchRefName)
 	if err != nil {
-		return errors.Wrapf(err, "GetRef(%s, %s, %s)", owner, repo, branchRefName)
+		return fmt.Errorf("GetRef(%s, %s, %s): %w", owner, repo, branchRefName, err)
 	}
 
 	if message = util.BuildCommitMessage(); message != "" && !viper.GetBool("lightweight") {
@@ -81,15 +80,15 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 			Tag:     &tagName,
 			Message: &message,
 			Object: &github.GitObject{
-				Type: github.String("commit"),
-				SHA:  github.String(branchRef.Object.GetSHA()),
+				Type: github.Ptr("commit"),
+				SHA:  github.Ptr(branchRef.Object.GetSHA()),
 			},
 		}
 		log.Infof("creating annotated tag")
 		log.Debugf("Tag: %+v", annotatedTag)
 		annotatedTag, _, err = client.V3.Git.CreateTag(ctx, owner, repo, annotatedTag)
 		if err != nil {
-			return errors.Wrap(err, "CreateTag")
+			return fmt.Errorf("CreateTag: %w", err)
 		}
 		tagRefObject = annotatedTag.GetSHA()
 	} else {
@@ -99,7 +98,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	tagRef := &github.Reference{
 		Ref: &tagRefName,
 		Object: &github.GitObject{
-			SHA: github.String(tagRefObject),
+			SHA: github.Ptr(tagRefObject),
 		},
 	}
 
@@ -107,16 +106,17 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 		log.Infof("creating tag reference")
 		_, _, err = client.V3.Git.CreateRef(ctx, owner, repo, tagRef)
 		if err != nil {
-			return errors.Wrap(err, "CreateRef")
+			return fmt.Errorf("CreateRef: %w", err)
 		}
 	} else {
 		log.Infof("updating tag reference")
 		_, _, err = client.V3.Git.UpdateRef(ctx, owner, repo, tagRef, true)
 		if err != nil {
-			return errors.Wrap(err, "UpdateRef")
+			return fmt.Errorf("UpdateRef: %w", err)
 		}
 	}
 
 	fmt.Printf("https://github.com/%s/%s/releases/tag/%s\n", owner, repo, tagName)
+
 	return
 }

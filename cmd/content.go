@@ -7,13 +7,13 @@ import (
 
 	"github.com/apex/log"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/nexthink-oss/ghup/internal/local"
-	"github.com/nexthink-oss/ghup/internal/remote"
-	"github.com/nexthink-oss/ghup/internal/util"
-	"github.com/pkg/errors"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/nexthink-oss/ghup/internal/local"
+	"github.com/nexthink-oss/ghup/internal/remote"
+	"github.com/nexthink-oss/ghup/internal/util"
 )
 
 var contentCmd = &cobra.Command{
@@ -64,7 +64,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 
 	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
 	if err != nil {
-		return errors.Wrap(err, "NewTokenClient")
+		return fmt.Errorf("NewTokenClient: %w", err)
 	}
 
 	separator := viper.GetString("separator")
@@ -74,7 +74,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 
 	repoInfo, err := client.GetRepositoryInfo(owner, repo, branch)
 	if err != nil {
-		return errors.Wrapf(err, "GetRepositoryInfo(%s, %s, %s)", owner, repo, branch)
+		return fmt.Errorf("GetRepositoryInfo(%s, %s, %s): %w", owner, repo, branch, err)
 	}
 
 	if repoInfo.IsEmpty {
@@ -97,7 +97,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		} else {
 			targetOid, err = client.GetRefOidV4(owner, repo, baseBranch)
 			if err != nil {
-				return errors.Wrapf(err, "GetRefOidV4(%s, %s, %s)", owner, repo, baseBranch)
+				return fmt.Errorf("GetRefOidV4(%s, %s, %s): %w", owner, repo, baseBranch, err)
 			}
 		}
 
@@ -108,7 +108,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 		log.Debugf("CreateRefInput: %+v", createRefInput)
 		if err := client.CreateRefV4(createRefInput); err != nil {
-			return errors.Wrap(err, "CreateRefV4")
+			return fmt.Errorf("CreateRefV4: %w", err)
 		}
 		newBranch = true
 	}
@@ -122,7 +122,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	for _, arg := range updateFiles {
 		target, content, err := local.GetLocalFileContent(arg, separator)
 		if err != nil {
-			return errors.Wrapf(err, "GetLocalFileContent(%s, %s)", arg, separator)
+			return fmt.Errorf("GetLocalFileContent(%s, %s): %w", arg, separator, err)
 		}
 		local_hash := plumbing.ComputeHash(plumbing.BlobObject, content).String()
 		remote_hash := client.GetFileHashV4(owner, repo, branch, target)
@@ -174,7 +174,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 
 	_, commitUrl, err := client.CreateCommitOnBranchV4(input)
 	if err != nil {
-		return errors.Wrap(err, "CommitOnBranchV4")
+		return fmt.Errorf("CommitOnBranchV4: %w", err)
 	}
 
 	if title := viper.GetString("pr-title"); newBranch && title != "" {
@@ -191,7 +191,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		log.Debugf("CreatePullRequestInput: %+v", input)
 		pullRequestUrl, err := client.CreatePullRequestV4(input)
 		if err != nil {
-			return errors.Wrap(err, "CreatePullRequestV4")
+			return fmt.Errorf("CreatePullRequestV4: %w", err)
 		}
 		fmt.Println(pullRequestUrl)
 	} else {
