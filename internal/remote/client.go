@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/gofri/go-github-ratelimit/github_ratelimit"
 	"github.com/google/go-github/v68/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
@@ -110,11 +111,15 @@ func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err
 	)
 
 	httpClient := oauth2.NewClient(ctx, src)
+	rateLimiter, err := github_ratelimit.NewRateLimitWaiterClient(httpClient.Transport)
+	if err != nil {
+		return nil, err
+	}
 
 	client = &TokenClient{
 		Context: ctx,
-		V3:      github.NewClient(httpClient),
-		V4:      githubv4.NewClient(httpClient),
+		V3:      github.NewClient(rateLimiter),
+		V4:      githubv4.NewClient(rateLimiter),
 	}
 
 	return client, nil
