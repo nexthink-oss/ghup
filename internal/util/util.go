@@ -2,10 +2,16 @@ package util
 
 import (
 	"cmp"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"iter"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/spf13/viper"
@@ -15,6 +21,27 @@ type RepositoryContext struct {
 	Owner  string
 	Name   string
 	Branch string
+}
+
+// IsBinaryInPath checks if a given binary is available in the PATH
+func IsBinaryInPath(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+// GetCliAuthToken tries to get a GitHub token by execing `gh auth token`
+func GetCliAuthToken() string {
+	if !viper.GetBool("no-cli-token") && IsBinaryInPath("gh") {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		ghCmd := exec.CommandContext(ctx, "gh", "auth", "token")
+		output, err := ghCmd.Output()
+		if err == nil {
+			return strings.TrimSpace(string(output))
+		}
+	}
+
+	return ""
 }
 
 // GithubActionsBranch returns the branch name if running in a GitHub Actions environment, or an empty string
@@ -101,7 +128,7 @@ func IsValidRefName(refName string) error {
 }
 
 // NormalizeRefName normalizes the ref name to match GitHub's expectations for the CreateRef/UpdateRef APIs
-func NormalizeRefName(refName string, defaultRefType string) (string, error) {
+func NormalizeRefName(refName string, refType string) (string, error) {
 	if err := IsValidRefName(refName); err != nil {
 		return "", err
 	}
@@ -110,7 +137,8 @@ func NormalizeRefName(refName string, defaultRefType string) (string, error) {
 	refName = strings.TrimPrefix(refName, "refs/")
 
 	if !(strings.HasPrefix(refName, "heads/") || strings.HasPrefix(refName, "tags/")) {
-		refName = strings.Join([]string{defaultRefType, refName}, "/")
+		refType = cmp.Or[string](refType, "heads")
+		refName = strings.Join([]string{refType, refName}, "/")
 	}
 
 	return refName, nil
@@ -135,12 +163,12 @@ func BuildCommitMessage() (message string) {
 
 // BuildTrailers generates the complete list of trailers from the configuration
 func BuildTrailers() (trailers []string) {
-	if trailerKey := viper.GetString("author.trailer"); trailerKey != "" && trailerKey != "-" {
+	if trailerKey := viper.GetString("author-trailer"); trailerKey != "" && trailerKey != "-" {
 		var userParts []string
-		if userName := viper.GetString("user.name"); userName != "" {
+		if userName := viper.GetString("user-name"); userName != "" {
 			userParts = append(userParts, userName)
 		}
-		if userEmail := viper.GetString("user.email"); userEmail != "" {
+		if userEmail := viper.GetString("user-email"); userEmail != "" {
 			userParts = append(userParts, fmt.Sprintf("<%s>", userEmail))
 		}
 		if len(userParts) > 0 {
@@ -151,4 +179,34 @@ func BuildTrailers() (trailers []string) {
 		trailers = append(trailers, fmt.Sprintf("%s: %s", key, value))
 	}
 	return
+}
+
+func FprintJSON(w io.Writer, r any) error {
+	b, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return fmt.Errorf("json.MarshalIndent: %w", err)
+	}
+
+	fmt.Fprintln(os.Stdout, string(b))
+	return nil
+}
+
+func SliceChain[T any](slices ...[]T) iter.Seq[T] {
+	return func(yield func(T) bool) {
+		for _, slice := range slices {
+			for _, e := range slice {
+				if !yield(e) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func MapValues[T any](m map[string]T) []T {
+	slice := make([]T, 0, len(m))
+	for _, v := range m {
+		slice = append(slice, v)
+	}
+	return slice
 }

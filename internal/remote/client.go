@@ -1,10 +1,8 @@
 package remote
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
@@ -13,12 +11,24 @@ import (
 	"github.com/google/go-github/v68/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
+
+	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-type TokenClient struct {
-	Context context.Context
+type Client struct {
+	context context.Context
+	repo    Repo
 	V3      *github.Client
 	V4      *githubv4.Client
+}
+
+type Repo struct {
+	Owner string
+	Name  string
+}
+
+func (r Repo) String() string {
+	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
 type BranchInfo struct {
@@ -100,7 +110,7 @@ type CreatePullRequestV4Mutation struct {
 	} `graphql:"createPullRequest(input: $input)"`
 }
 
-func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err error) {
+func NewClient(ctx context.Context, repo Repo, token string) (client *Client, err error) {
 	token, err = ResolveToken(token)
 	if err != nil {
 		return
@@ -116,8 +126,9 @@ func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err
 		return nil, err
 	}
 
-	client = &TokenClient{
-		Context: ctx,
+	client = &Client{
+		context: ctx,
+		repo:    repo,
 		V3:      github.NewClient(rateLimiter),
 		V4:      githubv4.NewClient(rateLimiter),
 	}
@@ -125,57 +136,71 @@ func NewTokenClient(ctx context.Context, token string) (client *TokenClient, err
 	return client, nil
 }
 
-func ResolveToken(tokenVar string) (token string, err error) {
-	token = tokenVar
-
+// ResolveToken tries to find a GitHub token in the following order:
+// 1. If the token is a file path, read the file and return the contents
+// 2. If the token is non-empty, return the token as is
+// 3. If the token is empty, return an error
+func ResolveToken(token string) (string, error) {
 	if _, err := os.Stat(token); err == nil {
 		tokenBytes, err := os.ReadFile(token)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("read token file: %w", err)
 		}
 		token = strings.TrimSpace(string(tokenBytes))
 	}
 
-	if token == "" {
-		return "", fmt.Errorf("no GitHub Token found")
+	if token != "" {
+		return token, nil
 	}
 
-	return
-}
-
-func WithAccept(accept string) github.RequestOption {
-	return func(req *http.Request) {
-		req.Header.Set("Accept", accept)
-	}
+	return "", fmt.Errorf("unable to resolve token")
 }
 
 // GetCommitSHA validates the existence of and retrieves the full SHA
 // of a commit given a short SHA
-func (c *TokenClient) GetCommitSHA(ctx context.Context, owner string, repo string, sha string) (*string, *github.Response, error) {
-	u := fmt.Sprintf("repos/%v/%v/commits/%v", owner, repo, sha)
-	req, err := c.V3.NewRequest("GET", u, nil, WithAccept("application/vnd.github.sha"))
+func (c *Client) GetCommitSHA(short string) (sha string, err error) {
+	sha, _, err = c.V3.Repositories.GetCommitSHA1(c.context, c.repo.Owner, c.repo.Name, short, "")
 	if err != nil {
-		return nil, nil, err
+		return "", err
 	}
 
-	var commit bytes.Buffer
-	resp, err := c.V3.Do(ctx, req, &commit)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	commitSHA := commit.String()
-	return &commitSHA, resp, nil
+	return sha, nil
 }
 
-func (c *TokenClient) GetRepositoryInfo(owner string, repo string, branch string) (repository RepositoryInfo, err error) {
+// GetRefSHA validates the existing of and returns the HEAD SHA of a ref
+func (c *Client) GetRefSHA(refName, refType string) (sha string, err error) {
+	refNorm, err := util.NormalizeRefName(refName, refType)
+	if err != nil {
+		return "", fmt.Errorf("NormalizeRefName(%s, %s): %w", refName, refType, err)
+	}
+
+	log.Infof("resolving ref: %s", refNorm)
+	ref, _, err := c.V3.Git.GetRef(c.context, c.repo.Owner, c.repo.Name, refNorm)
+	if err != nil {
+		return "", fmt.Errorf("GetRef(%s, %s, %s): %w", c.repo.Owner, c.repo.Name, refNorm, err)
+	}
+
+	return ref.Object.GetSHA(), nil
+}
+
+// GetSHA returns the full SHA of a commitish
+func (c *Client) GetSHA(commitish, defaultRefType string) (sha string, err error) {
+	if util.IsCommitHash(commitish) {
+		return c.GetCommitSHA(commitish)
+	}
+
+	return c.GetRefSHA(commitish, defaultRefType)
+}
+
+// GetRepositoryInfo returns information about a repository
+func (c *Client) GetRepositoryInfo(branch string) (repository RepositoryInfo, err error) {
 	var query RepositoryInfoQuery
 	variables := map[string]interface{}{
-		"owner":  githubv4.String(owner),
-		"repo":   githubv4.String(repo),
+		"owner":  githubv4.String(c.repo.Owner),
+		"repo":   githubv4.String(c.repo.Name),
 		"branch": githubv4.String(branch),
 	}
-	err = c.V4.Query(c.Context, &query, variables)
+	err = c.V4.Query(c.context, &query, variables)
 	if err != nil {
 		return
 	}
@@ -199,30 +224,31 @@ func (c *TokenClient) GetRepositoryInfo(owner string, repo string, branch string
 	return
 }
 
-func (c *TokenClient) GetFileHashV4(owner string, repo string, branch string, path string) (hash string) {
+// GetFileHashV4 returns the hash of a file on the given branch
+func (c *Client) GetFileHashV4(branch string, path string) (hash string) {
 	var query FileHashV4Query
 	variables := map[string]interface{}{
-		"owner":  githubv4.String(owner),
-		"repo":   githubv4.String(repo),
+		"owner":  githubv4.String(c.repo.Owner),
+		"repo":   githubv4.String(c.repo.Name),
 		"branch": githubv4.String(branch),
 		"path":   githubv4.String(path),
 	}
-	err := c.V4.Query(c.Context, &query, variables)
+	err := c.V4.Query(c.context, &query, variables)
 	if err == nil {
 		hash = string(query.Repository.Object.Commit.File.Oid)
 	}
 	return
 }
 
-func (c *TokenClient) GetRefOidV4(owner string, repo string, refName string) (oid githubv4.GitObjectID, err error) {
+func (c *Client) GetRefOidV4(refName string) (oid githubv4.GitObjectID, err error) {
 	var query RefOidV4Query
 	variables := map[string]interface{}{
-		"owner":   githubv4.String(owner),
-		"repo":    githubv4.String(repo),
+		"owner":   githubv4.String(c.repo.Owner),
+		"repo":    githubv4.String(c.repo.Name),
 		"refName": githubv4.String(refName),
 	}
 
-	err = c.V4.Query(c.Context, &query, variables)
+	err = c.V4.Query(c.context, &query, variables)
 	if err != nil {
 		return
 	}
@@ -234,18 +260,52 @@ func (c *TokenClient) GetRefOidV4(owner string, repo string, refName string) (oi
 	return
 }
 
-func (c *TokenClient) CreateRefV4(input githubv4.CreateRefInput) (err error) {
+func (c *Client) CreateAnnotationTag(name, message, sha string) (*github.Tag, error) {
+	annotatedTag := &github.Tag{
+		Tag:     &name,
+		Message: &message,
+		Object: &github.GitObject{
+			Type: github.Ptr("commit"),
+			SHA:  github.Ptr(sha),
+		},
+	}
+	log.Debugf("Tag: %+v", annotatedTag)
+	annotatedTag, _, err := c.V3.Git.CreateTag(c.context, c.repo.Owner, c.repo.Name, annotatedTag)
+	if err != nil {
+		return nil, fmt.Errorf("CreateTag(%s, %s): %w", c.repo, name, err)
+	}
+
+	return annotatedTag, nil
+}
+
+func (c *Client) CreateOrUpdateRef(old, new *github.Reference, force bool) error {
+	if old == nil {
+		log.Infof("CreateRef(%s, %s)", c.repo, new.String())
+		if _, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, new); err != nil {
+			return fmt.Errorf("CreateRef(%s, %s): %w", c.repo, new.String(), err)
+		}
+	} else {
+		log.Infof("UpdateRef(%s, %s)", c.repo, new.String())
+		if _, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, new, force); err != nil {
+			return fmt.Errorf("UpdateRef(%s, %s): %w", c.repo, new.String(), err)
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) CreateRefV4(input githubv4.CreateRefInput) (err error) {
 	var mutation CreateRefV4Mutation
 
-	err = c.V4.Mutate(c.Context, &mutation, input, nil)
+	err = c.V4.Mutate(c.context, &mutation, input, nil)
 
 	return
 }
 
-func (c *TokenClient) CreateCommitOnBranchV4(input githubv4.CreateCommitOnBranchInput) (oid githubv4.GitObjectID, url string, err error) {
+func (c *Client) CreateCommitOnBranchV4(input githubv4.CreateCommitOnBranchInput) (oid githubv4.GitObjectID, url string, err error) {
 	var mutation CreateCommitOnBranchV4Mutation
 
-	err = c.V4.Mutate(c.Context, &mutation, input, nil)
+	err = c.V4.Mutate(c.context, &mutation, input, nil)
 	if err != nil {
 		return
 	}
@@ -256,10 +316,10 @@ func (c *TokenClient) CreateCommitOnBranchV4(input githubv4.CreateCommitOnBranch
 	return
 }
 
-func (c *TokenClient) CreatePullRequestV4(input githubv4.CreatePullRequestInput) (url string, err error) {
+func (c *Client) CreatePullRequestV4(input githubv4.CreatePullRequestInput) (url string, err error) {
 	var mutation CreatePullRequestV4Mutation
 
-	err = c.V4.Mutate(c.Context, &mutation, input, nil)
+	err = c.V4.Mutate(c.context, &mutation, input, nil)
 	if err != nil {
 		return
 	}
@@ -269,11 +329,11 @@ func (c *TokenClient) CreatePullRequestV4(input githubv4.CreatePullRequestInput)
 	return
 }
 
-func (c *TokenClient) UpdateRefName(ctx context.Context, owner string, repo string, refName string, targetRef *github.Reference, force bool) (oldHash string, newHash string, err error) {
-	legacyRef, _, err := c.V3.Git.GetRef(ctx, owner, repo, refName)
+func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, force bool) (oldHash string, newHash string, err error) {
+	legacyRef, _, err := c.V3.Git.GetRef(c.context, c.repo.Owner, c.repo.Name, refName)
 	if err != nil {
 		log.Infof("creating ref %q", refName)
-		updatedRef, _, err := c.V3.Git.CreateRef(ctx, owner, repo, targetRef)
+		updatedRef, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, targetRef)
 		if err != nil {
 			return "", "", err
 		}
@@ -281,10 +341,45 @@ func (c *TokenClient) UpdateRefName(ctx context.Context, owner string, repo stri
 	}
 
 	log.Infof("updating ref %q", refName)
-	updatedRef, _, err := c.V3.Git.UpdateRef(ctx, owner, repo, targetRef, force)
+	updatedRef, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, targetRef, force)
 	if err != nil {
 		return "", "", err
 	}
 
 	return legacyRef.Object.GetSHA(), updatedRef.Object.GetSHA(), nil
+}
+
+func (c *Client) GetMatchingHeads(commitish string) (headNames []string, err error) {
+	branches, _, err := c.V3.Repositories.ListBranchesHeadCommit(c.context, c.repo.Owner, c.repo.Name, commitish)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, branch := range branches {
+		headNames = append(headNames, *branch.Name)
+	}
+
+	return headNames, nil
+}
+
+func (c *Client) GetMatchingTags(sha string) (tagNames []string, err error) {
+	// get all tags, iterating over all pages
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		tags, resp, err := c.V3.Repositories.ListTags(c.context, c.repo.Owner, c.repo.Name, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, tag := range tags {
+			if *tag.Commit.SHA == sha {
+				tagNames = append(tagNames, *tag.Name)
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+
+	return tagNames, nil
 }

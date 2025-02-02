@@ -1,8 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
+	"os"
 
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
@@ -24,41 +23,39 @@ type info struct {
 }
 
 var infoCmd = &cobra.Command{
-	Use:     "info [flags]",
-	Short:   "Dump info on the current context",
-	Args:    cobra.NoArgs,
-	PreRunE: validateFlags,
-	RunE:    runInfoCmd,
+	Use:   "info [flags]",
+	Short: "Dump info on the current context",
+	Args:  cobra.NoArgs,
+	RunE:  runInfoCmd,
 }
 
 func init() {
+	defaultsOnce.Do(loadDefaults)
+
+	flags := infoCmd.Flags()
+
+	addBranchFlag(flags)
+	addCommitMessageFlags(flags)
+
+	flags.SetNormalizeFunc(normalizeFlags)
 	rootCmd.AddCommand(infoCmd)
 }
 
 func runInfoCmd(cmd *cobra.Command, args []string) (err error) {
 	i := info{
-		HasToken:   len(viper.GetString("token")) > 0,
+		HasToken:   len(token) > 0,
 		Trailers:   util.BuildTrailers(),
-		Owner:      owner,
-		Repository: repo,
-		Branch:     branch,
+		Owner:      viper.GetString("owner"),
+		Repository: viper.GetString("repo"),
+		Branch:     viper.GetString("branch"),
+		Commit:     localRepo.HeadCommit(),
 		Message:    remote.CommitMessage(util.BuildCommitMessage()),
 	}
 
-	if localRepo != nil {
-		i.Commit = localRepo.HeadCommit()
-
-		status, err := localRepo.Status()
-		if err == nil {
-			i.Clean = status.IsClean()
-		}
+	status, err := localRepo.Status()
+	if err == nil {
+		i.Clean = status.IsClean()
 	}
 
-	m, err := json.MarshalIndent(i, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Print(string(m))
-	return
+	return util.FprintJSON(os.Stdout, i)
 }

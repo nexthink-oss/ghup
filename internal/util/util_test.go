@@ -330,9 +330,9 @@ func TestBuildCommitMessage(t *testing.T) {
 			name: "Message with trailers",
 			viperSettings: map[string]interface{}{
 				"message":        "This is a commit message",
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "Co-Authored-By",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 			},
 			expectedOutput: "This is a commit message\n\nCo-Authored-By: John Doe <john.doe@example.com>",
 		},
@@ -340,18 +340,18 @@ func TestBuildCommitMessage(t *testing.T) {
 			name: "Message with author trailer disabled",
 			viperSettings: map[string]interface{}{
 				"message":        "This is a commit message",
-				"author.trailer": "",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 			},
 			expectedOutput: "This is a commit message",
 		},
 		{
 			name: "Only trailers",
 			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "Co-Authored-By",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 			},
 			expectedOutput: "\nCo-Authored-By: John Doe <john.doe@example.com>",
 		},
@@ -359,9 +359,9 @@ func TestBuildCommitMessage(t *testing.T) {
 			name: "Multiple trailers",
 			viperSettings: map[string]interface{}{
 				"message":        "This is a commit message",
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "Co-Authored-By",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 				"trailer": map[string]string{
 					"Reviewed-By": "Jane Smith",
 				},
@@ -400,27 +400,27 @@ func TestBuildTrailers(t *testing.T) {
 		{
 			name: "Author trailer only",
 			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "Co-Authored-By",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 			},
 			expectedOutput: []string{"Co-Authored-By: John Doe <john.doe@example.com>"},
 		},
 		{
 			name: "Author trailer disabled",
 			viperSettings: map[string]interface{}{
-				"author.trailer": "",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 			},
 			expectedOutput: []string{},
 		},
 		{
 			name: "Multiple trailers",
 			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+				"author-trailer": "Co-Authored-By",
+				"user-name":      "John Doe",
+				"user-email":     "john.doe@example.com",
 				"trailer": map[string]string{
 					"Reviewed-By": "Jane Smith",
 				},

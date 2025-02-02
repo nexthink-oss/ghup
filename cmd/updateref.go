@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
-	"github.com/apex/log"
 	"github.com/google/go-github/v68/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -24,89 +22,78 @@ type sRef struct {
 type tRef struct {
 	Ref     string `json:"ref"`
 	Updated bool   `json:"updated"`
-	OldSHA  string `json:"old_sha,omitempty"`
+	OldSHA  string `json:"old,omitempty"`
 	SHA     string `json:"sha,omitempty"`
-	Error   error  `json:"error,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
-type report struct {
+type updateRefReport struct {
 	Source sRef   `json:"source"`
 	Target []tRef `json:"target"`
 }
 
-func (r report) String() string {
-	m, err := json.Marshal(r)
-	if err != nil {
-		log.Error(fmt.Sprintf("json.Marshal: %s", err))
-		return ""
-	}
-	return string(m)
-}
-
 var updateRefCmd = &cobra.Command{
-	Use:     "update-ref [flags] -s <source> <target> ...",
-	Short:   "Update target refs to match source",
-	PreRunE: validateFlags,
-	RunE:    runUpdateRefCmd,
+	Use:   "update-ref [flags] -s <source> <target> ...",
+	Short: "Update target refs to match source",
+	RunE:  runUpdateRefCmd,
 }
 
 func init() {
-	updateRefCmd.Flags().StringP("source", "s", "", "source `ref-or-commit`")
-	viper.BindPFlag("source", updateRefCmd.Flags().Lookup("source"))
+	defaultsOnce.Do(loadDefaults)
 
-	viper.BindEnv("targets", "GHUP_TARGETS")
+	flags := updateRefCmd.Flags()
+
+	flags.StringP("source", "s", "", "source `ref-or-commit`")
 
 	refTypes := []string{"heads", "tags"}
 
 	defaultSourceType := choiceflag.NewChoiceFlag(refTypes)
 	_ = defaultSourceType.Set("heads")
-	updateRefCmd.Flags().VarP(defaultSourceType, "source-type", "S", "unqualified source ref type")
-	viper.BindPFlag("source-type", updateRefCmd.Flags().Lookup("source-type"))
+	flags.VarP(defaultSourceType, "source-type", "S", "source ref type")
 
 	defaultTargetType := choiceflag.NewChoiceFlag(refTypes)
 	_ = defaultTargetType.Set("tags")
-	updateRefCmd.Flags().VarP(defaultTargetType, "target-type", "T", "unqualified target ref type")
-	viper.BindPFlag("target-type", updateRefCmd.Flags().Lookup("target-type"))
+	flags.VarP(defaultTargetType, "target-type", "T", "target ref type")
 
-	updateRefCmd.Flags().SortFlags = false
+	addForceFlag(flags)
+
+	flags.SetNormalizeFunc(normalizeFlags)
+	flags.SortFlags = false
 
 	rootCmd.AddCommand(updateRefCmd)
 }
 
 func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
-	ctx := context.Background()
+	ctx := cmd.Context()
 
-	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
-	if err != nil {
-		return fmt.Errorf("NewTokenClient: %w", err)
-	}
-
-	sourceRefName := viper.GetString("source")
-	if sourceRefName == "" {
+	sourceRef := viper.GetString("source")
+	if sourceRef == "" {
 		return errors.New("no source ref specified")
 	}
 
-	var sourceObject string
+	repo := remote.Repo{
+		Owner: viper.GetString("owner"),
+		Name:  viper.GetString("repo"),
+	}
+	force := viper.GetBool("force")
 
-	if util.IsCommitHash(sourceRefName) {
-		sourceCommit, _, err := client.GetCommitSHA(ctx, owner, repo, sourceRefName)
+	client, err := remote.NewClient(ctx, repo, token)
+	if err != nil {
+		return fmt.Errorf("NewClient(%s): %w", repo, err)
+	}
+
+	var sourceSHA string
+
+	if util.IsCommitHash(sourceRef) {
+		sourceSHA, err = client.GetCommitSHA(sourceRef)
 		if err != nil {
-			return fmt.Errorf("GetCommitSHA(%s, %s, %s): %w", owner, repo, sourceRefName, err)
+			return fmt.Errorf("GetCommitSHA(%s, %s): %w", repo, sourceRef, err)
 		}
-		sourceObject = *sourceCommit
 	} else {
-		sourceRefName, err = util.NormalizeRefName(sourceRefName, viper.GetString("source-type"))
+		sourceSHA, err = client.GetRefSHA(sourceRef, viper.GetString("source-type"))
 		if err != nil {
-			return fmt.Errorf("NormalizeRefName(%s, %s): %w", sourceRefName, viper.GetString("source-type"), err)
+			return fmt.Errorf("GetSourceRef(%s, %s): %w", repo, sourceRef, err)
 		}
-
-		log.Infof("resolving source ref: %s", sourceRefName)
-		sourceRef, _, err := client.V3.Git.GetRef(ctx, owner, repo, sourceRefName)
-		if err != nil {
-			return fmt.Errorf("GetSourceRef(%s, %s, %s): %w", owner, repo, sourceRefName, err)
-		}
-
-		sourceObject = sourceRef.Object.GetSHA()
 	}
 
 	var targetRefNames []string
@@ -121,24 +108,25 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// ensure all target refs are properly qualified
+	defaultTargetType := viper.GetString("target-type")
 	for i, targetRefName := range targetRefNames {
-		targetRefName, err = util.NormalizeRefName(targetRefName, viper.GetString("target-type"))
+		targetRefName, err = util.NormalizeRefName(targetRefName, defaultTargetType)
 		if err != nil {
-			return fmt.Errorf("NormalizeRefName(%s, %s): %w", targetRefName, viper.GetString("target-type"), err)
+			return fmt.Errorf("NormalizeRefName(%s, %s): %w", targetRefName, defaultTargetType, err)
 		}
 
 		targetRefNames[i] = targetRefName
 	}
 
-	report := report{
+	report := updateRefReport{
 		Source: sRef{
-			Ref: sourceRefName,
-			SHA: sourceObject,
+			Ref: sourceRef,
+			SHA: sourceSHA,
 		},
 		Target: make([]tRef, 0, len(targetRefNames)),
 	}
 
-	var returnError error = nil
+	var updateRefErrors = make([]error, 0)
 
 	for _, targetRefName := range targetRefNames {
 		targetReport := tRef{
@@ -148,14 +136,14 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		targetRef := &github.Reference{
 			Ref: &targetRefName,
 			Object: &github.GitObject{
-				SHA: github.Ptr(sourceObject),
+				SHA: github.Ptr(sourceSHA),
 			},
 		}
 
-		oldHash, newHash, err := client.UpdateRefName(ctx, owner, repo, targetRefName, targetRef, viper.GetBool("force"))
+		oldHash, newHash, err := client.UpdateRefName(targetRefName, targetRef, force)
 		if err != nil {
-			returnError = fmt.Errorf("Error(s) Detected")
-			targetReport.Error = fmt.Errorf("UpdateRefName: %w", err)
+			updateRefErrors = append(updateRefErrors, fmt.Errorf("%s: %w", targetRefName, err))
+			targetReport.Error = err.Error()
 			report.Target = append(report.Target, targetReport)
 			continue
 		}
@@ -167,7 +155,10 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		report.Target = append(report.Target, targetReport)
 	}
 
-	fmt.Print(report)
+	err = util.FprintJSON(os.Stdout, report)
+	if err != nil {
+		updateRefErrors = append(updateRefErrors, fmt.Errorf("PrintJson: %w", err))
+	}
 
-	return returnError
+	return errors.Join(updateRefErrors...)
 }
