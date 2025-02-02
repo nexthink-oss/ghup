@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v69/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -14,33 +14,42 @@ import (
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
+type tagReport struct {
+	Name        string `json:"name"`
+	SHA         string `json:"sha"`
+	ObjectSHA   string `json:"target,omitempty"`
+	Lightweight bool   `json:"lightweight"`
+	URL         string `json:"url"`
+}
+
 var tagCmd = &cobra.Command{
-	Use:     "tag [flags] [<name>]",
-	Short:   "Manage tags via the GitHub V3 API",
-	Args:    cobra.MaximumNArgs(1),
-	PreRunE: validateFlags,
-	RunE:    runTagCmd,
+	Use:   "tag [flags] [<name>]",
+	Short: "Create or update lightweight or annotated tags.",
+	Args:  cobra.MaximumNArgs(1),
+	RunE:  runTagCmd,
 }
 
 func init() {
-	tagCmd.Flags().String("tag", "", "tag name")
-	viper.BindPFlag("tag", tagCmd.Flags().Lookup("tag"))
+	defaultsOnce.Do(loadDefaults)
 
-	tagCmd.Flags().BoolP("lightweight", "l", false, "force lightweight tag")
-	viper.BindPFlag("lightweight", tagCmd.Flags().Lookup("lightweight"))
+	flags := tagCmd.Flags()
+	flags.String("tag", "", "tag `name`")
+	flags.BoolP("lightweight", "l", false, "force lightweight tag")
+	flags.StringP("commitish", "c", localRepo.Branch, "target `commitish`")
+	addBranchFlag(flags)
+	flags.MarkDeprecated("branch", "pass commitish via -c/--commitish instead")
+	flags.MarkHidden("branch")
+	addCommitMessageFlags(flags)
+	addForceFlag(flags)
 
-	tagCmd.Flags().SortFlags = false
+	flags.SetNormalizeFunc(normalizeFlags)
+	flags.SortFlags = false
 
 	rootCmd.AddCommand(tagCmd)
 }
 
 func runTagCmd(cmd *cobra.Command, args []string) (err error) {
-	ctx := context.Background()
-
-	client, err := remote.NewTokenClient(ctx, viper.GetString("token"))
-	if err != nil {
-		return fmt.Errorf("NewTokenClient: %w", err)
-	}
+	ctx := cmd.Context()
 
 	tagName := viper.GetString("tag")
 
@@ -49,74 +58,98 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if tagName == "" {
-		return fmt.Errorf("no tag specified")
+		return fmt.Errorf("tag is required")
 	}
 
-	branchRefName := fmt.Sprintf("heads/%s", branch)
+	repo := remote.Repo{
+		Owner: repoOwner,
+		Name:  repoName,
+	}
+	force := viper.GetBool("force")
 
-	tagRefName := fmt.Sprintf("tags/%s", tagName)
-	if err := util.IsValidRefName(tagRefName); err != nil {
+	report := tagReport{
+		Name: tagName,
+	}
+
+	client, err := remote.NewClient(ctx, repo, githubToken)
+	if err != nil {
+		return fmt.Errorf("NewClient(%s): %w", repo, err)
+	}
+
+	repoInfo, err := client.GetRepositoryInfo("")
+	if err != nil {
+		return fmt.Errorf("GetRepositoryInfo(%s): %w", repo, err)
+	}
+
+	if repoInfo.IsEmpty {
+		return errors.New("cannot tag empty repository")
+	}
+
+	commitish := viper.GetString("commitish")
+	var commitSha string
+	if commitish != "" {
+		commitSha, err = client.ResolveCommitish(commitish)
+		if err != nil {
+			return fmt.Errorf("ResolveCommitish(%s, %s): %w", repo, commitish, err)
+		}
+	} else {
+		commitish = repoInfo.DefaultBranch.Name
+		commitSha = string(repoInfo.DefaultBranch.Commit)
+	}
+
+	report.SHA = commitSha
+
+	tagRefName, err := util.QualifiedRefName(tagName, "tags")
+	if err != nil {
 		return fmt.Errorf("Invalid tag reference: %s: %w", tagRefName, err)
 	}
 
-	var tagRefObject string
-
-	log.Infof("getting tag reference: %s", tagRefName)
-	existingTagRef, resp, err := client.V3.Git.GetRef(ctx, owner, repo, tagRefName)
-	if err != nil && (resp == nil || resp.StatusCode != http.StatusNotFound) {
-		return fmt.Errorf("GetRef: %w", err)
-	} else if err == nil && !viper.GetBool("force") {
-		return fmt.Errorf("tag '%s' already exists: %s", tagName, *existingTagRef.Object.SHA)
-	}
-
-	log.Infof("getting branch reference: %s", branchRefName)
-	branchRef, _, err := client.V3.Git.GetRef(ctx, owner, repo, branchRefName)
+	log.Infof("checking tag reference: %s", tagRefName)
+	existingTagRef, resp, err := client.V3.Git.GetRef(ctx, repo.Owner, repo.Name, tagRefName)
 	if err != nil {
-		return fmt.Errorf("GetRef(%s, %s, %s): %w", owner, repo, branchRefName, err)
+		if resp == nil || resp.StatusCode != http.StatusNotFound {
+			return fmt.Errorf("GetRef(%s, %s): %w", repo, tagRefName, err)
+		}
+	} else {
+		report.URL = existingTagRef.GetURL()
+		existingSha := existingTagRef.GetObject().GetSHA()
+		if commitSha == existingSha {
+			// matching tag already exists
+			commandOutput = report
+			return nil
+		} else if !force {
+			// tag exists but points to a different commit
+			return fmt.Errorf("tag '%s' already exists: %s", tagName, existingSha)
+		}
 	}
 
-	if message = util.BuildCommitMessage(); message != "" && !viper.GetBool("lightweight") {
-		annotatedTag := &github.Tag{
-			Tag:     &tagName,
-			Message: &message,
-			Object: &github.GitObject{
-				Type: github.Ptr("commit"),
-				SHA:  github.Ptr(branchRef.Object.GetSHA()),
-			},
-		}
-		log.Infof("creating annotated tag")
-		log.Debugf("Tag: %+v", annotatedTag)
-		annotatedTag, _, err = client.V3.Git.CreateTag(ctx, owner, repo, annotatedTag)
+	if !viper.GetBool("lightweight") {
+		message := util.BuildCommitMessage()
+		tag, err := client.CreateAnnotationTag(tagName, message, commitSha)
 		if err != nil {
-			return fmt.Errorf("CreateTag: %w", err)
+			return fmt.Errorf("CreateAnnotationTag(%s, %s): %w", repo, tagName, err)
 		}
-		tagRefObject = annotatedTag.GetSHA()
-	} else {
-		tagRefObject = branchRef.Object.GetSHA()
+
+		commitSha = tag.GetSHA()
+		report.ObjectSHA = commitSha
 	}
 
 	tagRef := &github.Reference{
-		Ref: &tagRefName,
-		Object: &github.GitObject{
-			SHA: github.Ptr(tagRefObject),
-		},
+		Ref:    &tagRefName,
+		Object: &github.GitObject{SHA: github.Ptr(commitSha)},
 	}
 
-	if existingTagRef == nil {
-		log.Infof("creating tag reference")
-		_, _, err = client.V3.Git.CreateRef(ctx, owner, repo, tagRef)
-		if err != nil {
-			return fmt.Errorf("CreateRef: %w", err)
-		}
+	if err := client.CreateOrUpdateRef(existingTagRef, tagRef, true); err != nil {
+		return fmt.Errorf("CreateOrUpdateRef(%s, %s): %w", repo, tagRefName, err)
+	}
+
+	if existingTagRef != nil {
+		report.URL = existingTagRef.GetURL()
 	} else {
-		log.Infof("updating tag reference")
-		_, _, err = client.V3.Git.UpdateRef(ctx, owner, repo, tagRef, true)
-		if err != nil {
-			return fmt.Errorf("UpdateRef: %w", err)
-		}
+		report.URL = tagRef.GetURL()
 	}
 
-	fmt.Printf("https://github.com/%s/%s/releases/tag/%s\n", owner, repo, tagName)
+	commandOutput = report
 
-	return
+	return nil
 }

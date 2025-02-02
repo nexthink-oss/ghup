@@ -1,35 +1,99 @@
 package local
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-// GetLocalFileContent loads the content of a file and returns the target path and its contents
-func GetLocalFileContent(arg string, separator string) (target string, content []byte, err error) {
-	var source string
+var (
+	InvalidSpecError        = errors.New("invalid spec")
+	NoBranchSpecError       = errors.New("empty branch spec")
+	InvalidBranchNameError  = errors.New("invalid branch spec")
+	EmptySourceSpecError    = errors.New("empty source spec")
+	EmptyTargetSpecError    = errors.New("empty target spec")
+	SourceEqualsTargetError = errors.New("source and target files are the same")
+)
 
-	files := strings.SplitN(arg, separator, 2)
+// ParseCopySpec parses a file specification into remote source andtarget file paths.
+// The separator is used to split the source and target file paths.
+// All file paths are cleaned before being returned.
+func ParseCopySpec(spec, separator string) (branch, source, target string, err error) {
+	parts := strings.Split(spec, separator)
+	errs := make([]error, 0)
 
-	switch {
-	case len(files) < 1:
-		err = fmt.Errorf("invalid file parameter")
-		return
-	case files[0] == "":
-		err = fmt.Errorf("no source file specified")
-		return
-	case len(files) == 1:
-		source = files[0]
-		target = files[0]
-	case files[1] == "":
-		err = fmt.Errorf("no target file specified")
-		return
+	switch len(parts) {
+	case 2:
+		source = filepath.Clean(parts[0])
+		target = filepath.Clean(parts[1])
+
+	case 3:
+		branch = parts[0]
+		if err := util.IsValidRefName(branch); err != nil {
+			errs = append(errs, InvalidBranchNameError)
+		}
+
+		source = filepath.Clean(parts[1])
+		target = filepath.Clean(parts[2])
+
 	default:
-		source = files[0]
-		target = files[1]
+		errs = append(errs, InvalidSpecError)
 	}
 
-	content, err = os.ReadFile(source)
-	return
+	if source == "" {
+		errs = append(errs, EmptySourceSpecError)
+	}
+
+	if target == "" {
+		errs = append(errs, EmptyTargetSpecError)
+	}
+
+	if source == target {
+		errs = append(errs, SourceEqualsTargetError)
+	}
+
+	if len(errs) > 0 {
+		err = fmt.Errorf("copy-spec %q: %w", spec, errors.Join(errs...))
+	}
+
+	return branch, source, target, err
+}
+
+// ParseUpdateSpec parses a file specification into source and target file paths.
+// The separator is used to split the source and target file paths, if present.
+// All file paths are cleaned before being returned.
+func ParseUpdateSpec(spec, separator string) (source, target string, err error) {
+	files := strings.SplitN(spec, separator, 2)
+	errs := make([]error, 0)
+
+	switch len(files) {
+	case 1:
+		clean := filepath.Clean(files[0])
+		source = clean
+		target = clean
+
+	case 2:
+		source = filepath.Clean(files[0])
+		target = filepath.Clean(files[1])
+
+	default:
+		errs = append(errs, InvalidSpecError)
+	}
+
+	if source == "" {
+		errs = append(errs, EmptySourceSpecError)
+	}
+
+	if target == "" {
+		errs = append(errs, EmptyTargetSpecError)
+	}
+
+	if len(errs) > 0 {
+		err = fmt.Errorf("update-spec %q: %w", spec, errors.Join(errs...))
+	}
+
+	return source, target, err
 }

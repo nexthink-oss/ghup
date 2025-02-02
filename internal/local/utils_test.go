@@ -1,36 +1,34 @@
 package local
 
 import (
-	"bytes"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestGetLocalFileContent(t *testing.T) {
+func TestSplitUpdateSpec(t *testing.T) {
 	testFilePath := filepath.Join("testdata", "testfile.txt")
-	testFileContent := []byte("test content\n")
 	tests := []struct {
-		name        string
-		arg         string
-		separator   string
-		wantTarget  string
-		wantContent []byte
-		wantErr     bool
+		name       string
+		arg        string
+		separator  string
+		wantSource string
+		wantTarget string
+		wantErr    bool
 	}{
 		{
-			name:        "Single file",
-			arg:         testFilePath,
-			separator:   ":",
-			wantTarget:  testFilePath,
-			wantContent: testFileContent,
+			name:       "Single file",
+			arg:        testFilePath,
+			separator:  ":",
+			wantSource: testFilePath,
+			wantTarget: testFilePath,
 		},
 		{
-			name:        "Source and target",
-			arg:         strings.Join([]string{testFilePath, "destfile.txt"}, ":"),
-			separator:   ":",
-			wantTarget:  "destfile.txt",
-			wantContent: testFileContent,
+			name:       "Source and target",
+			arg:        strings.Join([]string{testFilePath, "destfile.txt"}, ":"),
+			separator:  ":",
+			wantSource: testFilePath,
+			wantTarget: "destfile.txt",
 		},
 		{
 			name:      "Empty parameter",
@@ -51,26 +49,26 @@ func TestGetLocalFileContent(t *testing.T) {
 			wantErr:   true,
 		},
 		{
-			name:        "Alternate separator",
-			arg:         strings.Join([]string{testFilePath, "destfile.txt"}, "=>"),
-			separator:   "=>",
-			wantTarget:  "destfile.txt",
-			wantContent: testFileContent,
+			name:       "Alternate separator",
+			arg:        strings.Join([]string{testFilePath, "destfile.txt"}, "=>"),
+			separator:  "=>",
+			wantSource: testFilePath,
+			wantTarget: "destfile.txt",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotTarget, gotContent, err := GetLocalFileContent(tt.arg, tt.separator)
+			gotSource, gotTarget, err := ParseUpdateSpec(tt.arg, tt.separator)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GetLocalFileContent() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("SplitUpdateSpec() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotTarget != tt.wantTarget {
-				t.Errorf("GetLocalFileContent() gotTarget = %v, want %v", gotTarget, tt.wantTarget)
+			if gotSource != tt.wantSource {
+				t.Errorf("SplitUpdateSpec() gotSource = %v, want %v", gotSource, tt.wantSource)
 			}
-			if !bytes.Equal(gotContent, tt.wantContent) {
-				t.Errorf("GetLocalFileContent() gotContent = %v, want %v", gotContent, tt.wantContent)
+			if gotTarget != tt.wantTarget {
+				t.Errorf("SplitUpdateSpec() gotTarget = %v, want %v", gotTarget, tt.wantTarget)
 			}
 		})
 	}
