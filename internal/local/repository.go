@@ -1,6 +1,7 @@
 package local
 
 import (
+	"cmp"
 	"strings"
 
 	giturls "github.com/chainguard-dev/git-urls"
@@ -9,66 +10,77 @@ import (
 )
 
 type Repository struct {
-	Repository *git.Repository
-	Owner      string
-	Name       string
-	Branch     string
-	UserName   string
-	UserEmail  string
+	Repository *git.Repository `json:"-"`
+	Owner      string          `json:"owner"`
+	Name       string          `json:"name"`
+	Path       string          `json:"path" default:"."`
+	Branch     string          `json:"branch" default:"main"`
+	User       struct {
+		Name  string `json:"name"`
+		Email string `json:"email"`
+	} `json:"user"`
 }
 
-func GetRepository(path string) (ghr *Repository) {
-	options := &git.PlainOpenOptions{
-		DetectDotGit: true,
-	}
-	repo, err := git.PlainOpenWithOptions(path, options)
+// SetDefaults implements defaults.Setter interface
+func (r *Repository) SetDefaults() {
+	options := &git.PlainOpenOptions{DetectDotGit: true}
+	repo, err := git.PlainOpenWithOptions(r.Path, options)
 	if err != nil {
 		return
 	}
 
-	remotes, err := repo.Remotes()
+	r.Repository = repo
+
+	head, err := repo.Head()
 	if err != nil {
 		return
 	}
 
-	for _, remote := range remotes {
+	branchName := cmp.Or[string](head.Name().Short(), "main")
+	branch, err := repo.Branch(branchName)
+	if err != nil {
+		return
+	}
+
+	r.Branch = branchName
+
+	remoteName := cmp.Or[string](branch.Remote, "origin")
+
+	remote, err := repo.Remote(remoteName)
+	if err == nil {
 		remoteConfig := *remote.Config()
-		if o, r, ok := parseRemote(remoteConfig.URLs[0]); ok {
-			ghr = &Repository{
-				Repository: repo,
-				Owner:      o,
-				Name:       r,
-				Branch:     "main",
-			}
-			head, err := repo.Head()
-			if err == nil {
-				ghr.Branch = head.Name().Short()
-			}
-			config, err := repo.ConfigScoped(config.GlobalScope)
-			if err == nil {
-				ghr.UserName = config.User.Name
-				ghr.UserEmail = config.User.Email
-			}
-			return
+		if owner, name, ok := parseRemote(remoteConfig.URLs[0]); ok {
+			r.Owner = owner
+			r.Name = name
+		}
+	}
+
+	config, err := repo.ConfigScoped(config.GlobalScope)
+	if err == nil {
+		r.User.Name = config.User.Name
+		r.User.Email = config.User.Email
+	}
+}
+
+func (r *Repository) HeadCommit() (hash string) {
+	if r.Repository == nil {
+		head, err := r.Repository.Head()
+		if err == nil {
+			hash = head.Hash().String()
 		}
 	}
 	return
 }
 
-func (r *Repository) HeadCommit() (hash string) {
-	head, err := r.Repository.Head()
-	if err == nil {
-		hash = head.Hash().String()
-	}
-	return
-}
-
 func (r *Repository) Status() (status git.Status, err error) {
-	worktree, err := r.Repository.Worktree()
-	if err != nil {
-		return nil, err
+	if r.Repository == nil {
+		worktree, err := r.Repository.Worktree()
+		if err != nil {
+			return nil, err
+		}
+		return worktree.Status()
 	}
-	return worktree.Status()
+	return nil, nil
 }
 
 func parseRemote(remote string) (owner string, repo string, ok bool) {
