@@ -3,7 +3,7 @@ description: "Fast-forward target ref to source"
 author: "Nexthink"
 inputs:
   source:
-    description: "Source ref-or-commit HEAD"
+    description: "Source commit-ish"
     required: true
   target:
     description: "Refs to fast-forward to match source (newline-separated)"

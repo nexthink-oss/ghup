@@ -1,6 +1,6 @@
 # `fast-forward` action
 
-The `nexthink-oss/ghup/actions/fast-forward` action will fast-forward one or more `target` refs (heads or tags) to match `source`.
+The `nexthink-oss/ghup/actions/fast-forward` action will fast-forward one or more `target` refs (heads or tags) to match `source` commit-ish.
 
 It can be used, for example, to create/update tags or to implement true fast-forward merge for GitHub PRs.
 
@@ -8,7 +8,7 @@ It can be used, for example, to create/update tags or to implement true fast-for
 
 ### `source` input
 
-**Required** a ref-or-commit from which to source the target commit.
+**Required** a commit-ish from which to source the target commit.
 
 ### `target` input
 
