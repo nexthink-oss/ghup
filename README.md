@@ -3,37 +3,43 @@
 
 # ghup
 
-A GitHub API client for managing tags and repository content from third-party automation systems (e.g. Jenkins).
+`ghup` is a fully standalone command-line tool to manage GitHub repository content and refs (branches and tags) directly via the GitHub API.
 
 ## Features
 
-* Create and update tags, both lightweight and annotated.
-* Add, update and delete content idempotently.
-* Idempotent update of git refs (e.g. fast-forward merge and mutable tags).
-* GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of commit signing.
-* Configuration defaults inferred from local context (e.g. git clone and environment).
-* Completely self-contained: no external dependencies.
+- Idempotent create, update and delete of repository content, including pull requests, with or without local clone; all commits verified by GitHub.
+- GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of universal commit signing.
+- Create and update tags, both lightweight and annotated.
+- Arbitrary git ref cloning, including fast-forward merge and mutable tag updates.
+- Server-side resolution of commit-ish to commit SHA, matching branches and tags.
+- Smart defaults from context, and configurability via flags or environment variables.
+- Self-contained without external dependencies.
+- 12-Factor app style configuration via flags, environment variables, and/or configuration file.
+
+`ghup` is fully standalone and not a GitHub CLI wrapper, and does not seek to replicate GitHub CLI functionality, but rather to provide a simple, scriptable interface to GitHub content and refs.
 
 ## Requirements
 
-* A GitHub Token, preferably derived from GitHub App credentials (for verified commits), with `contents=write` and `metadata=read` permissions on target repository. In addition, `workflows=write` is also needed if used to manage `.github/workflows` content.
+- A GitHub Token, preferably derived from GitHub App credentials (for verified commits), with `contents=write` and `metadata=read` permissions on target repository. In addition, `workflows=write` is also needed if used to manage `.github/workflows` content.
 
-Note: works well with [vault-plugin-secrets-github](https://github.com/martinbaillie/vault-plugin-secrets-github)!
+Integrates works well with [vault-plugin-secrets-github](https://github.com/martinbaillie/vault-plugin-secrets-github), [octo-sts](https://github.com/octo-sts/app) and similar.
 
 ## Configuration
 
-If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--author.trailer`, `--user.name` and `--user.email`, or disable with `--author.trailer=` or `export GHUP_AUTHOR_TRAILER=`). Additional commit trailers can be specified with `--trailer key=value` flags.
+If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--user-trailer`, `--user-name` and `--user-email`, or disable with `--user-trailer=` or `export GHUP_USER_TRAILER=`). Additional commit trailers can be specified with `--trailer key=value` flags.
 
-If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, with `--branch` defaulting to `main`.
+If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, together with `--branch` dependending on the command.
 
-All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_AUTHOR_TRAILER`, etc.
+All configuration may be passed via file (JSON, TOML, YAML, HCL, envfile and Java properties), with the configuration file base name specified via `--config-name`, and the configuration file search path optionally extended via `--config-path` (default: `.`). For example, `--config-name=ghup-config` will search for `ghup-config.json`, `ghup-config.toml`, `ghup-config.yaml`, `ghup-config.yml`, `ghup-config.hcl`, `ghup-config.env` and `ghup-config.properties` in the current directory.
 
-In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
+All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_USER_TRAILER`, etc.
+
+In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_AUTHOR_TRAILER`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
 
 The environment variable `GITHUB_REPOSITORY`, always set in GitHub Actions workflow context in the form `<owner>/<repo>`, is only used to set initial defaults for `--owner` and `--repo`, but will be overridden by local repository context and more specific configuration.
-If `GITHUB_REPOSITORY` is set, then `--branch` will also default from `GITHUB_HEAD_REF` in pull request context, or `GITHUB_REF_NAME` otherwise.
+If and only if `GITHUB_REPOSITORY` is set, then `--branch` will also default from `GITHUB_HEAD_REF` in pull request context, or `GITHUB_REF_NAME` otherwise.
 
-For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/token-file`, `--token <(gh auth token)` or `export GHUP_TOKEN=/path/to/token-file ghup …`)
+For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/token-file`, or `export GHUP_TOKEN=/path/to/token-file ghup …`). Unless disabled with `--no-cli-token`/`GHUP_NO_CLI_TOKEN=1`, `ghup` will attempt to retrieve a token from the GitHub CLI (i.e. `gh auth token`) if no other token is provided.
 
 ## Installation
 
@@ -59,10 +65,15 @@ The [`nexthink-oss/ghup/actions/setup`](actions/setup/) action is available to m
 
 ## Usage
 
-### Content
+### `ghup content`
 
 The `content` verb is used to generate arbitrary (verified) commits via the GitHub V4 API.
+
 An arbitrary number of content adds, removes and deletes can be committed without the need for a local signing key or for checking out the target repository.
+
+When run from a cloned repository, all changed files or just staged changes can be pushed back via `--all` and `--staged` flags.
+
+If updates target a protected branch, XXX TODO
 
 ```console
 $ ghup content --help

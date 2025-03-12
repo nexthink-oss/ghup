@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v69/github"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
@@ -53,13 +53,14 @@ func NewClient(ctx context.Context, repo Repo, token string) (client *Client, er
 	)
 
 	httpClient := oauth2.NewClient(ctx, src)
-	rateLimiter, err := github_ratelimit.NewRateLimitWaiterClient(httpClient.Transport)
+	rateLimiter := github_ratelimit.NewClient(httpClient.Transport)
 	if err != nil {
 		return nil, err
 	}
 
 	client = &Client{
-		context: ctx,
+		// disable go-github's built-in rate limiting
+		context: context.WithValue(ctx, github.BypassRateLimitCheck, true),
 		repo:    repo,
 		V3:      github.NewClient(rateLimiter),
 		V4:      githubv4.NewClient(rateLimiter),
