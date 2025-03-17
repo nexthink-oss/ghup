@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,7 +70,6 @@ func normalizeFlags(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 
 // commonSetup binds flags to viper and checks mandatory flags are set
 func commonSetup(cmd *cobra.Command, args []string) error {
-
 	flags := cmd.Flags()
 	errs := make([]error, 0)
 
@@ -106,23 +104,24 @@ func commonSetup(cmd *cobra.Command, args []string) error {
 	log.SetHandler(cli.New(cmd.ErrOrStderr()))
 	log.SetLevel(log.Level(int(log.WarnLevel) - viper.GetInt("verbose")))
 
-	githubToken = cmp.Or[string](viper.GetString("token"), util.GetCliAuthToken())
-	if githubToken == "" {
-		errs = append(errs, fmt.Errorf("token is required"))
+	if viper.GetString("token") == "" {
+		token := util.GetCliAuthToken()
+		if token != "" {
+			viper.Set("token", token)
+		} else {
+			errs = append(errs, fmt.Errorf("token is required"))
+		}
 	}
 
-	repoOwner = viper.GetString("owner")
-	if repoOwner == "" {
+	if viper.GetString("owner") == "" {
 		errs = append(errs, fmt.Errorf("owner is required"))
 	}
 
-	repoName = viper.GetString("repo")
-	if repoName == "" {
+	if viper.GetString("repo") == "" {
 		errs = append(errs, fmt.Errorf("repo is required"))
 	}
 
-	branchName = viper.GetString("branch")
-	if flags.Lookup("branch") != nil && branchName == "" {
+	if flags.Lookup("branch") != nil && viper.GetString("branch") == "" {
 		errs = append(errs, fmt.Errorf("branch is required"))
 	}
 

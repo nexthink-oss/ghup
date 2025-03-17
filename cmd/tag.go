@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"net/http"
 
 	"github.com/apex/log"
 	"github.com/google/go-github/v69/github"
@@ -14,25 +13,36 @@ import (
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-type tagReport struct {
-	Name        string `json:"name"`
-	SHA         string `json:"sha"`
-	ObjectSHA   string `json:"target,omitempty"`
-	Lightweight bool   `json:"lightweight"`
-	URL         string `json:"url"`
+type TagOutput struct {
+	Tag          string `json:"tag" yaml:"tag"`
+	Commitish    string `json:"commitish" yaml:"commitish"`
+	SHA          string `json:"sha" yaml:"sha"`
+	URL          string `json:"url" yaml:"url"`
+	Updated      bool   `json:"updated" yaml:"updated"`
+	Error        error  `json:"-" yaml:"-"`
+	ErrorMessage string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-var tagCmd = &cobra.Command{
-	Use:   "tag [flags] [<name>]",
-	Short: "Create or update lightweight or annotated tags.",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runTagCmd,
+func (o *TagOutput) GetError() error {
+	return o.Error
 }
 
-func init() {
-	defaultsOnce.Do(loadDefaults)
+func (o *TagOutput) SetError(err error) {
+	o.Error = err
+	if err != nil {
+		o.ErrorMessage = err.Error()
+	}
+}
 
-	flags := tagCmd.Flags()
+func cmdTag() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tag [flags] [<name>]",
+		Short: "Create or update lightweight or annotated tags.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE:  runTagCmd,
+	}
+
+	flags := cmd.Flags()
 	flags.String("tag", "", "tag `name`")
 	flags.BoolP("lightweight", "l", false, "force lightweight tag")
 	flags.StringP("commitish", "c", localRepo.Branch, "target `commitish`")
@@ -45,7 +55,7 @@ func init() {
 	flags.SetNormalizeFunc(normalizeFlags)
 	flags.SortFlags = false
 
-	rootCmd.AddCommand(tagCmd)
+	return cmd
 }
 
 func runTagCmd(cmd *cobra.Command, args []string) (err error) {
@@ -62,16 +72,15 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	repo := remote.Repo{
-		Owner: repoOwner,
-		Name:  repoName,
+		Owner: viper.GetString("owner"),
+		Name:  viper.GetString("repo"),
 	}
+
+	lightweight := viper.GetBool("lightweight")
 	force := viper.GetBool("force")
+	update := false
 
-	report := tagReport{
-		Name: tagName,
-	}
-
-	client, err := remote.NewClient(ctx, repo, githubToken)
+	client, err := remote.NewClient(ctx, &repo)
 	if err != nil {
 		return fmt.Errorf("NewClient(%s): %w", repo, err)
 	}
@@ -86,18 +95,26 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	commitish := viper.GetString("commitish")
-	var commitSha string
+	var targetSha string
 	if commitish != "" {
-		commitSha, err = client.ResolveCommitish(commitish)
+		targetSha, err = client.ResolveCommitish(commitish)
 		if err != nil {
 			return fmt.Errorf("ResolveCommitish(%s, %s): %w", repo, commitish, err)
 		}
+		if targetSha == "" {
+			return fmt.Errorf("commitish %q not found", commitish)
+		}
 	} else {
 		commitish = repoInfo.DefaultBranch.Name
-		commitSha = string(repoInfo.DefaultBranch.Commit)
+		targetSha = string(repoInfo.DefaultBranch.Commit)
 	}
 
-	report.SHA = commitSha
+	output := &TagOutput{
+		Tag:       tagName,
+		Commitish: commitish,
+		SHA:       targetSha,
+		URL:       client.GetCommitURL(targetSha),
+	}
 
 	tagRefName, err := util.QualifiedRefName(tagName, "tags")
 	if err != nil {
@@ -105,51 +122,76 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	log.Infof("checking tag reference: %s", tagRefName)
-	existingTagRef, resp, err := client.V3.Git.GetRef(ctx, repo.Owner, repo.Name, tagRefName)
-	if err != nil {
-		if resp == nil || resp.StatusCode != http.StatusNotFound {
-			return fmt.Errorf("GetRef(%s, %s): %w", repo, tagRefName, err)
-		}
-	} else {
-		report.URL = existingTagRef.GetURL()
-		existingSha := existingTagRef.GetObject().GetSHA()
-		if commitSha == existingSha {
-			// matching tag already exists
-			commandOutput = report
-			return nil
-		} else if !force {
-			// tag exists but points to a different commit
-			return fmt.Errorf("tag '%s' already exists: %s", tagName, existingSha)
-		}
-	}
-
-	if !viper.GetBool("lightweight") {
-		message := util.BuildCommitMessage()
-		tag, err := client.CreateAnnotationTag(tagName, message, commitSha)
-		if err != nil {
-			return fmt.Errorf("CreateAnnotationTag(%s, %s): %w", repo, tagName, err)
-		}
-
-		commitSha = tag.GetSHA()
-		report.ObjectSHA = commitSha
-	}
 
 	tagRef := &github.Reference{
 		Ref:    &tagRefName,
-		Object: &github.GitObject{SHA: github.Ptr(commitSha)},
+		Object: &github.GitObject{SHA: github.Ptr(targetSha)},
 	}
 
-	if err := client.CreateOrUpdateRef(existingTagRef, tagRef, true); err != nil {
-		return fmt.Errorf("CreateOrUpdateRef(%s, %s): %w", repo, tagRefName, err)
-	}
-
-	if existingTagRef != nil {
-		report.URL = existingTagRef.GetURL()
+	tagObj, err := client.GetTagObj(tagRefName)
+	if err != nil {
+		// tag does not exist, or other error
+		if !errors.Is(err, remote.NoMatchingObjectError) {
+			return fmt.Errorf("GetTagObj(%s): %w", tagRefName, err)
+		}
+		log.Debug("tag does not exist")
+		// fallthrough to create non-existent tag
 	} else {
-		report.URL = tagRef.GetURL()
+		// tag already exists
+		log.Debugf("tag exists: %+v", tagObj)
+		if targetSha == tagObj.Commit.SHA && lightweight == tagObj.Lightweight {
+			// matching tag already exists
+			log.Infof("tag exists: idempotent")
+			return cmdOutput(cmd, output)
+		} else if !force {
+			log.Infof("tag exists: wrong type without force")
+			// tag exists but points to a different commit
+			if tagObj.Lightweight {
+				err = fmt.Errorf("lightweight tag already exists, targeting %s", tagObj.Commit.SHA)
+			} else {
+				err = fmt.Errorf("annotated tag already exists, targeting %s", tagObj.Commit.SHA)
+			}
+			output.SetError(err)
+			return cmdOutput(cmd, output)
+		} else {
+			log.Infof("tag exists: forcing update")
+			update = true
+		}
 	}
 
-	commandOutput = report
+	if !lightweight {
+		message := util.BuildCommitMessage()
+		log.Debugf("creating tag object: %s", tagName)
+		tag, err := client.CreateTag(tagName, message, targetSha)
+		if err != nil {
+			output.SetError(fmt.Errorf("creating tag object: %w", err))
+			return cmdOutput(cmd, output)
+		}
 
-	return nil
+		log.Debugf("created tag object: %+v", tag)
+
+		tagRef.Object = &github.GitObject{SHA: tag.SHA}
+	}
+
+	if update {
+		log.Infof("updating tag reference: %s", tagRefName)
+		_, err = client.UpdateRef(tagRef, true)
+		if err != nil {
+			err = fmt.Errorf("updating tag ref: %w", err)
+		}
+	} else {
+		log.Infof("creating tag reference: %s", tagRefName)
+		_, err = client.CreateRef(tagRef)
+		if err != nil {
+			err = fmt.Errorf("updating tag ref: %w", err)
+		}
+	}
+
+	if err == nil {
+		output.Updated = true
+	} else {
+		output.SetError(err)
+	}
+
+	return cmdOutput(cmd, output)
 }

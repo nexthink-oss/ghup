@@ -14,37 +14,45 @@ import (
 )
 
 type source struct {
-	Commitish string `json:"commitish"`
-	SHA       string `json:"sha"`
+	Commitish string `json:"commitish" yaml:"commitish"`
+	SHA       string `json:"sha,omitempty" yaml:"sha,omitempty"`
+	Error     string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-type tRef struct {
-	Ref     string `json:"ref"`
-	Error   string `json:"error,omitempty"`
-	OldSHA  string `json:"old,omitempty"`
-	SHA     string `json:"sha,omitempty"`
-	Updated bool   `json:"updated"`
+type targetRef struct {
+	Ref     string `json:"ref" yaml:"ref"`
+	OldSHA  string `json:"old,omitempty" yaml:"old,omitempty"`
+	SHA     string `json:"sha,omitempty" yaml:"sha,omitempty"`
+	Updated bool   `json:"updated" yaml:"updated"`
+	Error   string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-type UpdateRefReport struct {
-	Repository string `json:"repository,omitempty"`
-	Source     source `json:"source"`
-	Target     []tRef `json:"target"`
+type UpdateRefOutput struct {
+	Repository string      `json:"repository,omitempty" yaml:"repository,omitempty"`
+	Source     source      `json:"source" yaml:"source"`
+	Target     []targetRef `json:"target,omitempty" yaml:"target,omitempty"`
+	Error      error       `json:"-" yaml:"-"`
 }
 
-var updateRefCmd = &cobra.Command{
-	Use:   "update-ref [flags] -s <source-commitish> <target-ref> ...",
-	Short: "Update target refs to match source commitish.",
-	Long: `Update target refs to match source commitish.
+func (o *UpdateRefOutput) GetError() error {
+	return o.Error
+}
+
+func (o *UpdateRefOutput) SetError(err error) {
+	o.Error = err
+}
+
+func cmdUpdateRef() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update-ref [flags] -s <source-commitish> <target-ref> ...",
+		Short: "Update target refs to match source commitish.",
+		Long: `Update target refs to match source commitish.
 Source commitish may also be passed via the GHUP_SOURCE environment variable,
 and target refs via GHUP_TARGETS (space-delimited).`,
-	RunE: runUpdateRefCmd,
-}
+		RunE: runUpdateRefCmd,
+	}
 
-func init() {
-	defaultsOnce.Do(loadDefaults)
-
-	flags := updateRefCmd.Flags()
+	flags := cmd.Flags()
 
 	flags.StringP("source", "s", "", "source `commitish`")
 
@@ -67,7 +75,7 @@ func init() {
 	flags.SetNormalizeFunc(normalizeFlags)
 	flags.SortFlags = false
 
-	rootCmd.AddCommand(updateRefCmd)
+	return cmd
 }
 
 func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
@@ -79,22 +87,35 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	repo := remote.Repo{
-		Owner: repoOwner,
-		Name:  repoName,
+		Owner: viper.GetString("owner"),
+		Name:  viper.GetString("repo"),
 	}
 	force := viper.GetBool("force")
 
-	client, err := remote.NewClient(ctx, repo, githubToken)
+	client, err := remote.NewClient(ctx, &repo)
 	if err != nil {
 		return fmt.Errorf("NewClient(%s): %w", repo, err)
 	}
 
+	output := &UpdateRefOutput{
+		Repository: repo.String(),
+		Source: source{
+			Commitish: commitish,
+		},
+	}
+
 	commitSha, err := client.ResolveCommitish(commitish)
 	if err != nil {
-		return fmt.Errorf("resolving commitish %q: %w", commitish, err)
+		err = fmt.Errorf("resolving commitish: %w", err)
+		output.SetError(err)
+		output.Source.Error = err.Error()
+		return cmdOutput(cmd, output)
 	}
 	if commitSha == "" {
-		return fmt.Errorf("failed to resolve %q", commitish)
+		err = fmt.Errorf("source commitish does not exist")
+		output.SetError(err)
+		output.Source.Error = err.Error()
+		return cmdOutput(cmd, output)
 	}
 
 	var targetRefNames []string
@@ -119,19 +140,13 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		targetRefNames[i] = targetRefName
 	}
 
-	report := UpdateRefReport{
-		Repository: repo.String(),
-		Source: source{
-			Commitish: commitish,
-			SHA:       commitSha,
-		},
-		Target: make([]tRef, 0, len(targetRefNames)),
-	}
+	output.Source.SHA = commitSha
+	output.Target = make([]targetRef, 0, len(targetRefNames))
 
 	var updateRefErrors = make([]error, 0)
 
 	for _, targetRefName := range targetRefNames {
-		targetReport := tRef{
+		targetReport := targetRef{
 			Ref: targetRefName,
 		}
 
@@ -146,7 +161,7 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		if err != nil {
 			updateRefErrors = append(updateRefErrors, fmt.Errorf("%s: %w", targetRefName, err))
 			targetReport.Error = err.Error()
-			report.Target = append(report.Target, targetReport)
+			output.Target = append(output.Target, targetReport)
 			continue
 		}
 		targetReport.SHA = newHash
@@ -154,10 +169,12 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 			targetReport.OldSHA = oldHash
 			targetReport.Updated = true
 		}
-		report.Target = append(report.Target, targetReport)
+		output.Target = append(output.Target, targetReport)
 	}
 
-	commandOutput = report
+	if len(updateRefErrors) > 0 {
+		output.SetError(fmt.Errorf("updating refs: %w", errors.Join(updateRefErrors...)))
+	}
 
-	return errors.Join(updateRefErrors...)
+	return cmdOutput(cmd, output)
 }

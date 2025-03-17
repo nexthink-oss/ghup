@@ -1,7 +1,15 @@
 package main
 
-import "github.com/nexthink-oss/ghup/cmd"
+import (
+	"context"
+	"os"
+
+	"github.com/nexthink-oss/ghup/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	ctx := context.Background()
+	if err := cmd.New().ExecuteContext(ctx); err != nil {
+		os.Exit(1)
+	}
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"cmp"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,26 +19,37 @@ import (
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-type contentReport struct {
-	Repository  string              `json:"repository,omitempty"`
-	SHA         string              `json:"sha"`
-	Updated     bool                `json:"updated"`
-	PullRequest *remote.PullRequest `json:"pullrequest,omitempty" yaml:"pullrequest,omitempty"`
+type ContentOutput struct {
+	Repository   string              `json:"repository,omitempty" yaml:"repository,omitempty"`
+	SHA          string              `json:"sha" yaml:"sha"`
+	Updated      bool                `json:"updated" yaml:"updated"`
+	PullRequest  *remote.PullRequest `json:"pullrequest,omitempty" yaml:"pullrequest,omitempty"`
+	Error        error               `json:"-" yaml:"-"`
+	ErrorMessage string              `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
-var contentCmd = &cobra.Command{
-	Use:     "content [flags] [<file-spec> ...]",
-	Aliases: []string{"commit"},
-	Short:   "Manage repository content.",
-	Long:    `Directly manage repository content via the GitHub API, ensuring verified commits from CI systems.`,
-	Args:    cobra.ArbitraryArgs,
-	RunE:    runContentCmd,
+func (o *ContentOutput) GetError() error {
+	return o.Error
 }
 
-func init() {
-	defaultsOnce.Do(loadDefaults)
+func (o *ContentOutput) SetError(err error) {
+	o.Error = err
+	if err != nil {
+		o.ErrorMessage = err.Error()
+	}
+}
 
-	flags := contentCmd.Flags()
+func cmdContent() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "content [flags] [<file-spec> ...]",
+		Aliases: []string{"commit"},
+		Short:   "Manage repository content.",
+		Long:    `Directly manage repository content via the GitHub API, ensuring verified commits from CI systems.`,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    runContentCmd,
+	}
+
+	flags := cmd.Flags()
 
 	flags.Bool("tracked", false, "commit changes to tracked files")
 	flags.Bool("staged", false, "commit staged changes")
@@ -56,7 +68,7 @@ func init() {
 	flags.SetNormalizeFunc(normalizeFlags)
 	flags.SortFlags = false
 
-	rootCmd.AddCommand(contentCmd)
+	return cmd
 }
 
 func runContentCmd(cmd *cobra.Command, args []string) (err error) {
@@ -68,18 +80,18 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	repo := remote.Repo{
-		Owner: repoOwner,
-		Name:  repoName,
+		Owner: viper.GetString("owner"),
+		Name:  viper.GetString("repo"),
 	}
-	targetBranch := branchName
+	targetBranch := viper.GetString("branch")
 	dryRun := viper.GetBool("dry-run")
 	force := viper.GetBool("force")
 
-	report := contentReport{
+	output := &ContentOutput{
 		Repository: repo.String(),
 	}
 
-	client, err := remote.NewClient(ctx, repo, githubToken)
+	client, err := remote.NewClient(ctx, &repo)
 	if err != nil {
 		return fmt.Errorf("NewClient(%s): %w", repo, err)
 	}
@@ -102,7 +114,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		log.Debug("target branch is new")
 
 		if !viper.GetBool("create-branch") {
-			return fmt.Errorf("branch %q does not exist", targetBranch)
+			output.SetError(fmt.Errorf("branch %q does not exist", targetBranch))
+			return cmdOutput(cmd, output)
 		}
 
 		// determine the oid for the target branch
@@ -111,7 +124,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		} else {
 			targetOid, err = client.GetRefOidV4(baseBranch)
 			if err != nil {
-				return fmt.Errorf("GetRefOidV4(%s, %s): %w", repo, baseBranch, err)
+				output.SetError(fmt.Errorf("getting oid for %q: %w", baseBranch, err))
+				return cmdOutput(cmd, output)
 			}
 		}
 
@@ -126,7 +140,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			log.Debugf("CreateRefInput: %+v", createRefInput)
 
 			if err := client.CreateRefV4(createRefInput); err != nil {
-				return fmt.Errorf("CreateRefV4: %w", err)
+				output.SetError(fmt.Errorf("creating branch %q: %w", targetBranch, err))
+				return cmdOutput(cmd, output)
 			}
 		} else {
 			log.Infof("dry-run: skipping creation of branch: %q from %s", targetBranch, targetOid)
@@ -139,21 +154,23 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	commitStaged := viper.GetBool("staged")
 	commitTracked := viper.GetBool("tracked")
 
+	errs := make([]error, 0)
+
 	if commitStaged || commitTracked {
 		gitStatus, err := localRepo.Status()
 		if err != nil {
-			return fmt.Errorf("Local repository status: %w", err)
-		}
-
-		if commitStaged {
-			pathContent, deletionSet, err = localRepo.Staged(gitStatus)
-			if err != nil {
-				return fmt.Errorf("calculating staged changes: %w", err)
-			}
-		} else { // commitTracked
-			pathContent, deletionSet, err = localRepo.Tracked(gitStatus)
-			if err != nil {
-				return fmt.Errorf("calculating all changes: %w", err)
+			errs = append(errs, fmt.Errorf("getting local repository status: %w", err))
+		} else {
+			if commitStaged {
+				pathContent, deletionSet, err = localRepo.Staged(gitStatus)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("calculating staged changes: %w", err))
+				}
+			} else { // commitTracked
+				pathContent, deletionSet, err = localRepo.Tracked(gitStatus)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("calculating tracked changes: %w", err))
+				}
 			}
 		}
 	}
@@ -161,29 +178,29 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	for _, spec := range viper.GetStringSlice("copy") {
 		branch, source, target, err := local.ParseCopySpec(spec, separator)
 		if err != nil {
-			return fmt.Errorf("ParseCopySpec(%q, %q): %w", spec, separator, err)
-		}
-
-		branch = cmp.Or(branch, baseBranch)
-		if content, ok := client.GetFileContentV4(branch, source); ok {
-			pathContent[target] = []byte(content)
+			errs = append(errs, fmt.Errorf("copy spec %q: %w", spec, err))
+		} else {
+			branch = cmp.Or(branch, baseBranch)
+			if content, ok := client.GetFileContentV4(branch, source); ok {
+				pathContent[target] = []byte(content)
+			}
 		}
 	}
 
 	for spec := range util.SliceChain(viper.GetStringSlice("update"), args) {
 		source, target, err := local.ParseUpdateSpec(spec, separator)
 		if err != nil {
-			return fmt.Errorf("ParseUpdateSpec(%q, %q): %w", spec, separator, err)
-		}
+			errs = append(errs, fmt.Errorf("update spec %q: %w", spec, err))
+		} else {
+			content, err := os.ReadFile(source)
+			if err != nil {
+				return fmt.Errorf("ReadFile(%s): %w", source, err)
+			}
 
-		content, err := os.ReadFile(source)
-		if err != nil {
-			return fmt.Errorf("ReadFile(%s): %w", source, err)
+			pathContent[target] = content
+			// an explicit update overrides previous deletions
+			delete(deletionSet, target)
 		}
-
-		pathContent[target] = content
-		// an explicit update overrides previous deletions
-		delete(deletionSet, target)
 	}
 
 	for _, target := range viper.GetStringSlice("delete") {
@@ -191,6 +208,11 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		deletionSet[target] = struct{}{}
 		// an explicit deletion overrides previous updates
 		delete(pathContent, target)
+	}
+
+	if len(errs) > 0 {
+		output.SetError(fmt.Errorf("parsing content specs: %w", errors.Join(errs...)))
+		return cmdOutput(cmd, output)
 	}
 
 	// we now have the full set of changes, so can proceed to calculate idempotent operations
@@ -228,7 +250,8 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	deletions := util.MapValues(deletionMap)
 
 	if len(additions) == 0 && len(deletions) == 0 {
-		report.SHA = string(repoInfo.TargetBranch.Commit)
+		output.SHA = string(repoInfo.TargetBranch.Commit)
+		output.Updated = false
 	} else {
 
 		changes := githubv4.FileChanges{
@@ -250,13 +273,14 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		if !dryRun {
 			sha, _, err := client.CreateCommitOnBranchV4(input)
 			if err != nil {
-				return fmt.Errorf("CommitOnBranchV4: %w", err)
+				output.SetError(fmt.Errorf("committing changes: %w", err))
+				return cmdOutput(cmd, output)
 			}
 
-			report.SHA = string(sha)
+			output.SHA = string(sha)
 		}
 
-		report.Updated = true
+		output.Updated = true
 	}
 
 	if prTitle := viper.GetString("pr-title"); prTitle != "" {
@@ -274,26 +298,27 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		if !targetBranchIsNew {
 			prExists, err = client.FindPullRequestUrl(&pullRequest)
 			if err != nil {
-				return fmt.Errorf("finding open pull requests: %w", err)
+				output.SetError(fmt.Errorf("searching open pull requests: %w", err))
+				return cmdOutput(cmd, output)
 			}
 		}
 
 		if prExists {
 			log.Debugf("found open pull request: %s", pullRequest.Url)
-			report.PullRequest = &pullRequest
+			output.PullRequest = &pullRequest
 		} else {
 			if !dryRun {
 				log.Debugf("opening pull request from %q to %q", pullRequest.Head, pullRequest.Base)
 				err = client.CreatePullRequestV4(&pullRequest)
 				if err != nil {
-					return fmt.Errorf("CreatePullRequestV4: %w", err)
+					output.SetError(fmt.Errorf("opening pull request: %w", err))
+					return cmdOutput(cmd, output)
 				}
 			}
-			report.PullRequest = &pullRequest
+
+			output.PullRequest = &pullRequest
 		}
 	}
 
-	commandOutput = report
-
-	return nil
+	return cmdOutput(cmd, output)
 }

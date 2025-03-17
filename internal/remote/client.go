@@ -2,7 +2,9 @@ package remote
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -10,14 +12,19 @@ import (
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v69/github"
 	"github.com/shurcooL/githubv4"
+	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
 
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
+var (
+	NoMatchingObjectError = errors.New("no matching object found")
+)
+
 type Client struct {
 	context context.Context
-	repo    Repo
+	repo    *Repo
 	V3      *github.Client
 	V4      *githubv4.Client
 }
@@ -27,25 +34,25 @@ type Repo struct {
 	Name  string `json:"repo"`
 }
 
-func (r Repo) String() string {
+func (r *Repo) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner, r.Name)
 }
 
 type PullRequest struct {
 	RepoId string `json:"-" yaml:"-"`
 	Number int    `json:"number,omitzero" yaml:"number,omitempty"`
-	Url    string `json:"url"`
-	Head   string `json:"head"`
-	Base   string `json:"base"`
-	Draft  bool   `json:"draft"`
-	Title  string `json:"title"`
+	Url    string `json:"url" yaml:"url"`
+	Head   string `json:"head" yaml:"head"`
+	Base   string `json:"base" yaml:"base"`
+	Draft  bool   `json:"draft" yaml:"draft"`
+	Title  string `json:"title" yaml:"title"`
 	Body   string `json:"-" yaml:"-"`
 }
 
-func NewClient(ctx context.Context, repo Repo, token string) (client *Client, err error) {
-	token, err = ResolveToken(token)
+func NewClient(ctx context.Context, repo *Repo) (*Client, error) {
+	token, err := ResolveToken(viper.GetString("token"))
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	src := oauth2.StaticTokenSource(
@@ -54,11 +61,8 @@ func NewClient(ctx context.Context, repo Repo, token string) (client *Client, er
 
 	httpClient := oauth2.NewClient(ctx, src)
 	rateLimiter := github_ratelimit.NewClient(httpClient.Transport)
-	if err != nil {
-		return nil, err
-	}
 
-	client = &Client{
+	client := &Client{
 		// disable go-github's built-in rate limiting
 		context: context.WithValue(ctx, github.BypassRateLimitCheck, true),
 		repo:    repo,
@@ -87,6 +91,10 @@ func ResolveToken(token string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unable to resolve token")
+}
+
+func (c *Client) GetCommitURL(sha string) string {
+	return fmt.Sprintf("https://github.com/%s/%s/commit/%s", c.repo.Owner, c.repo.Name, sha)
 }
 
 // GetCommitSHA validates the existence of and retrieves the full SHA
@@ -150,8 +158,9 @@ func (c *Client) ResolveCommitish(commitish string) (sha string, err error) {
 
 	sha = string(query.Repository.Object.Commit.Oid)
 	if sha == "" {
-		err = fmt.Errorf("commitish %q does not exist", commitish)
+		err = NoMatchingObjectError
 	}
+
 	return sha, nil
 }
 
@@ -276,6 +285,14 @@ func (c *Client) GetFileHashV4(branch string, path string) (hash string) {
 	return
 }
 
+func (c *Client) GetRef(refName string) (*github.Reference, error) {
+	ref, resp, err := c.V3.Git.GetRef(c.context, c.repo.Owner, c.repo.Name, refName)
+	if err != nil && resp.StatusCode == http.StatusNotFound {
+		return nil, NoMatchingObjectError
+	}
+	return ref, err
+}
+
 func (c *Client) GetRefOidV4(refName string) (oid githubv4.GitObjectID, err error) {
 	var query struct {
 		Repository struct {
@@ -305,8 +322,96 @@ func (c *Client) GetRefOidV4(refName string) (oid githubv4.GitObjectID, err erro
 	return
 }
 
-func (c *Client) CreateAnnotationTag(name, message, sha string) (*github.Tag, error) {
-	annotatedTag := &github.Tag{
+type TagObj struct {
+	Name   string
+	Commit struct {
+		SHA string
+		URL string
+	}
+	Lightweight bool
+	Object      struct {
+		SHA     string
+		Message string
+	}
+}
+
+// GetTag resolves a tag reference, returning a pseudo-reference
+func (c *Client) GetTagObj(name string) (tagObj *TagObj, err error) {
+	refName, err := util.QualifiedRefName(name, "tags")
+	if err != nil {
+		return nil, fmt.Errorf("QualifiedRefName(%s, tags): %w", name, err)
+	}
+
+	var query struct {
+		Repository struct {
+			Ref *struct {
+				Target struct {
+					Typename     githubv4.String `graphql:"__typename"`
+					CommitFields struct {
+						Oid githubv4.GitObjectID
+						Url githubv4.URI
+					} `graphql:"... on Commit"`
+					TagFields struct {
+						Oid     githubv4.GitObjectID
+						Message githubv4.String
+						Target  struct {
+							Typename githubv4.String `graphql:"__typename"`
+							Commit   struct {
+								Oid githubv4.GitObjectID
+								Url githubv4.URI
+							} `graphql:"... on Commit"`
+						}
+					} `graphql:"... on Tag"`
+				}
+			} `graphql:"ref(qualifiedName: $ref)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]any{
+		"owner": githubv4.String(c.repo.Owner),
+		"repo":  githubv4.String(c.repo.Name),
+		"ref":   githubv4.String(refName),
+	}
+
+	tagObj = &TagObj{
+		Name: refName,
+	}
+
+	err = c.V4.Query(c.context, &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	if query.Repository.Ref == nil {
+		return nil, NoMatchingObjectError
+	}
+
+	switch tag := query.Repository.Ref.Target; tag.Typename {
+	case "Commit":
+		tagObj.Lightweight = true
+		tagObj.Commit.SHA = string(tag.CommitFields.Oid)
+		tagObj.Commit.URL = tag.CommitFields.Url.String()
+
+	case "Tag":
+		tagObj.Lightweight = false
+		tagObj.Object.SHA = string(tag.TagFields.Oid)
+		tagObj.Object.Message = string(tag.TagFields.Message)
+		if tag.TagFields.Target.Typename == "Commit" {
+			tagObj.Commit.SHA = string(tag.TagFields.Target.Commit.Oid)
+			tagObj.Commit.URL = tag.TagFields.Target.Commit.Url.String()
+		} else {
+			return nil, fmt.Errorf("unsupported annotated tag type: %s", tag.TagFields.Target.Typename)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported tag type: %s", tag.Typename)
+	}
+
+	return tagObj, nil
+}
+
+func (c *Client) CreateTag(name, message, sha string) (*github.Tag, error) {
+	tag := &github.Tag{
 		Tag:     &name,
 		Message: &message,
 		Object: &github.GitObject{
@@ -314,26 +419,39 @@ func (c *Client) CreateAnnotationTag(name, message, sha string) (*github.Tag, er
 			SHA:  github.Ptr(sha),
 		},
 	}
-	log.Debugf("Tag: %+v", annotatedTag)
-	annotatedTag, _, err := c.V3.Git.CreateTag(c.context, c.repo.Owner, c.repo.Name, annotatedTag)
+	log.Debugf("Tag: %+v", tag)
+	tag, _, err := c.V3.Git.CreateTag(c.context, c.repo.Owner, c.repo.Name, tag)
 	if err != nil {
 		return nil, fmt.Errorf("CreateTag(%s, %s): %w", c.repo, name, err)
 	}
 
-	return annotatedTag, nil
+	return tag, nil
 }
 
-func (c *Client) CreateOrUpdateRef(old, new *github.Reference, force bool) error {
-	if old == nil {
-		log.Infof("CreateRef(%s, %s)", c.repo, new.String())
-		if _, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, new); err != nil {
-			return fmt.Errorf("CreateRef(%s, %s): %w", c.repo, new.String(), err)
-		}
-	} else {
-		log.Infof("UpdateRef(%s, %s)", c.repo, new.String())
-		if _, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, new, force); err != nil {
-			return fmt.Errorf("UpdateRef(%s, %s): %w", c.repo, new.String(), err)
-		}
+func (c *Client) CreateRef(ref *github.Reference) (*github.Reference, error) {
+	log.Infof("CreateRef(%s, %s)", c.repo, ref.String())
+	ref, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, ref)
+	if err != nil {
+		return nil, fmt.Errorf("CreateRef(%s, %s): %w", c.repo, ref.String(), err)
+	}
+
+	return ref, nil
+}
+
+func (c *Client) UpdateRef(ref *github.Reference, force bool) (*github.Reference, error) {
+	log.Infof("UpdateRef(%s, %s, %v)", c.repo, ref.String(), force)
+	ref, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, ref, force)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateRef(%s, %s, %v): %w", c.repo, ref.String(), force, err)
+	}
+
+	return ref, nil
+}
+
+func (c *Client) DeleteRef(ref string) error {
+	log.Infof("DeleteRef(%s, %s)", c.repo, ref)
+	if _, err := c.V3.Git.DeleteRef(c.context, c.repo.Owner, c.repo.Name, ref); err != nil {
+		return fmt.Errorf("DeleteRef(%s, %s): %w", c.repo, ref, err)
 	}
 
 	return nil

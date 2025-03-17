@@ -1,18 +1,24 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
-	"os"
 
 	"github.com/apex/log"
+	"github.com/creasty/defaults"
 	"github.com/spf13/cobra"
 
 	"github.com/nexthink-oss/ghup/internal/local"
 	"github.com/nexthink-oss/ghup/internal/util"
 )
 
-type Encoder interface {
+type OutputEncoder interface {
 	Encode(any) error
+}
+
+type CommandOutput interface {
+	GetError() error
+	SetError(error)
 }
 
 var (
@@ -22,35 +28,22 @@ var (
 
 	localRepo local.Repository
 
-	githubToken string
-	repoOwner   string
-	repoName    string
-	branchName  string
-
-	outputEncoder Encoder
-	commandOutput any
+	outputEncoder OutputEncoder
 )
 
-var rootCmd = &cobra.Command{
-	Use:                "ghup",
-	Short:              "Update GitHub content and tags via API",
-	SilenceUsage:       true,
-	PersistentPreRunE:  commonSetup,
-	PersistentPostRunE: encodeOutput,
-	Version:            fmt.Sprintf("%s-%s (built %s)", version, commit, date),
-}
-
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+func New() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:               "ghup",
+		Short:             "Update GitHub content and tags via API",
+		SilenceUsage:      true,
+		PersistentPreRunE: commonSetup,
+		Version:           fmt.Sprintf("%s-%s (built %s)", version, commit, date),
 	}
-}
 
-func init() {
 	// load defaults from local repository context, if available
-	defaultsOnce.Do(loadDefaults)
+	if err := defaults.Set(&localRepo); err != nil {
+		panic(err)
+	}
 
 	// override defaults from GitHub Actions environment variables
 	// in case we're running without a checkout
@@ -64,8 +57,8 @@ func init() {
 
 	log.Debugf("local repository: %+v", localRepo)
 
-	flags := rootCmd.Flags()
-	persistentFlags := rootCmd.PersistentFlags()
+	flags := cmd.Flags()
+	persistentFlags := cmd.PersistentFlags()
 
 	persistentFlags.StringSlice("config-path", []string{"."}, "configuration `name`")
 	persistentFlags.StringP("config-name", "C", "", "configuration `name`")
@@ -79,11 +72,25 @@ func init() {
 
 	flags.SortFlags = false
 	persistentFlags.SortFlags = false
+
+	cmd.AddCommand(
+		cmdContent(),
+		cmdDebug(),
+		cmdResolve(),
+		cmdTag(),
+		cmdUpdateRef(),
+	)
+
+	return cmd
 }
 
-func encodeOutput(_ *cobra.Command, _ []string) error {
-	if commandOutput != nil {
-		return outputEncoder.Encode(commandOutput)
+func cmdOutput(cmd *cobra.Command, output CommandOutput) error {
+	outputErr := output.GetError()
+
+	encodeErr := outputEncoder.Encode(output)
+	if encodeErr == nil {
+		cmd.SilenceErrors = true
 	}
-	return nil
+
+	return errors.Join(outputErr, encodeErr)
 }
