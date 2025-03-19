@@ -64,7 +64,7 @@ jobs:
       - name: Update Environment Tag
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        uses: nexthink-oss/ghup/actions/fast-forward
+        uses: nexthink-oss/ghup/actions/fast-forward@main
         with:
           source: ${{ inputs.revision }}
           target: tags/${{ inputs.environment }}

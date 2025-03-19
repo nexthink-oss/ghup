@@ -3,51 +3,31 @@
 
 # ghup
 
-`ghup` is a fully standalone command-line tool to manage GitHub repository content and refs (branches and tags) directly via the GitHub API.
+`ghup` is a command-line tool for managing GitHub repository content and refs (branches and tags) directly via the GitHub API, with a focus on enabling verified commits from build systems such as GitHub Actions or Jenkins.
 
-## Features
+## Key Features
 
-- Idempotent create, update and delete of repository content, including pull requests, with or without local clone; all commits verified by GitHub.
-- GitHub-verified commits (when using a GitHub App-derived token), facilitating the enforcement of universal commit signing.
-- Create and update tags, both lightweight and annotated.
-- Arbitrary git ref cloning, including fast-forward merge and mutable tag updates.
-- Server-side resolution of commit-ish to commit SHA, matching branches and tags.
-- Smart defaults from context, and configurability via flags or environment variables.
-- Self-contained without external dependencies.
-- 12-Factor app style configuration via flags, environment variables, and/or configuration file.
-
-`ghup` is fully standalone and not a GitHub CLI wrapper, and does not seek to replicate GitHub CLI functionality, but rather to provide a simple, scriptable interface to GitHub content and refs.
+- Create, update, and delete repository content with verified commits via GitHub API
+- Create and update both lightweight and annotated tags
+- Synchronise arbitrary git refs, including fast-forward merges
+- Resolve commit references to full SHAs
+- Open pull requests for changes
+- Smart context detection for repository and branch information
+- 12-Factor app style configuration via flags, environment variables, or files
+- No external dependencies required
 
 ## Requirements
 
-- A GitHub Token, preferably derived from GitHub App credentials (for verified commits), with `contents=write` and `metadata=read` permissions on target repository. In addition, `workflows=write` is also needed if used to manage `.github/workflows` content.
-
-Integrates works well with [vault-plugin-secrets-github](https://github.com/martinbaillie/vault-plugin-secrets-github), [octo-sts](https://github.com/octo-sts/app) and similar.
-
-## Configuration
-
-If the current working directory is a git repository, its first GitHub remote (if there is one) is used to infer default repository owner (`--owner`) and name (`--repo`), the current branch is used to set the default branch (`--branch`), and resolved git config is used to set a default author for a generated `Co-Authored-By` commit message trailer to help distinguish between different systems sharing common GitHub App credentials (override components with `--user-trailer`, `--user-name` and `--user-email`, or disable with `--user-trailer=` or `export GHUP_USER_TRAILER=`). Additional commit trailers can be specified with `--trailer key=value` flags.
-
-If run outside a GitHub repository, then the `--owner` and `--repo` flags are required, together with `--branch` dependending on the command.
-
-All configuration may be passed via file (JSON, TOML, YAML, HCL, envfile and Java properties), with the configuration file base name specified via `--config-name`, and the configuration file search path optionally extended via `--config-path` (default: `.`). For example, `--config-name=ghup-config` will search for `ghup-config.json`, `ghup-config.toml`, `ghup-config.yaml`, `ghup-config.yml`, `ghup-config.hcl`, `ghup-config.env` and `ghup-config.properties` in the current directory.
-
-All configuration may be passed via environment variable rather than flag. The environment variable associated with each flag is `GHUP_[UPPERCASED_FLAG_NAME]`, e.g. `GHUP_TOKEN`, `GHUP_OWNER`, `GHUP_REPO`, `GHUP_BRANCH`, `GHUP_USER_TRAILER`, etc.
-
-In addition, various fallback environment variables are supported for better integration with Jenkins and similar CI tools: `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `CHANGE_BRANCH`, `BRANCH_NAME`, `GIT_BRANCH`, `GIT_AUTHOR_TRAILER`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL`, etc.
-
-The environment variable `GITHUB_REPOSITORY`, always set in GitHub Actions workflow context in the form `<owner>/<repo>`, is only used to set initial defaults for `--owner` and `--repo`, but will be overridden by local repository context and more specific configuration.
-If and only if `GITHUB_REPOSITORY` is set, then `--branch` will also default from `GITHUB_HEAD_REF` in pull request context, or `GITHUB_REF_NAME` otherwise.
-
-For security, it is strongly recommended that the GitHub Token by passed via environment (`GHUP_TOKEN` or `GITHUB_TOKEN`) or file path (`--token /path/to/token-file`, or `export GHUP_TOKEN=/path/to/token-file ghup …`). Unless disabled with `--no-cli-token`/`GHUP_NO_CLI_TOKEN=1`, `ghup` will attempt to retrieve a token from the GitHub CLI (i.e. `gh auth token`) if no other token is provided.
+- A GitHub token with `contents=write` and `metadata=read` permissions (plus `workflows=write` if managing GitHub workflows)
+- For verified commits, use a token derived from GitHub App credentials
 
 ## Installation
 
-### Generic
+### Pre-built Binaries
 
-Binaries for all supported platforms and architectures are available from [GitHub Releases](https://github.com/nexthink-oss/ghup/releases/latest).
+Download binaries for all platforms from [GitHub Releases](https://github.com/nexthink-oss/ghup/releases/latest).
 
-Alternatively, install to `$GOBIN` with a local Go toolchain:
+### Using Go
 
 ```sh
 go install github.com/nexthink-oss/ghup@latest
@@ -61,216 +41,133 @@ brew install isometry/tap/ghup
 
 ### GitHub Actions
 
-The [`nexthink-oss/ghup/actions/setup`](actions/setup/) action is available to make the `ghup` tool available in GitHub Actions.
-
-## Usage
-
-### `ghup content`
-
-The `content` verb is used to generate arbitrary (verified) commits via the GitHub V4 API.
-
-An arbitrary number of content adds, removes and deletes can be committed without the need for a local signing key or for checking out the target repository.
-
-When run from a cloned repository, all changed files or just staged changes can be pushed back via `--all` and `--staged` flags.
-
-If updates target a protected branch, XXX TODO
-
-```console
-$ ghup content --help
-Manage content via the GitHub V4 API
-
-Usage:
-  ghup content [flags] [<file-spec> ...]
-
-Flags:
-      --create-branch      create missing target branch (default true)
-      --pr-title string    create pull request iff target branch is created and title is specified
-      --pr-body string     pull request body
-      --pr-draft           create pull request in draft mode
-      --base-branch name   base branch name (default: "[remote-default-branch])"
-  -s, --separator string   file-spec separator (default ":")
-  -u, --update file-spec   file-spec to update
-  -d, --delete file-path   file-path to delete
-  -h, --help               help for content
-
-Global Flags:
-      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch name          target branch name (default "[local-branch-or-main]")
-  -f, --force                force action
-  -m, --message string       message (default "Commit via API")
-  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string         GitHub Token or path/to/token-file
-      --trailer key=value    extra key=value commit trailers (default [])
-      --user.email email     email for commit author trailer (default "[user.email]")
-      --user.name name       name for commit author trailer (default "[user.name]")
-  -v, --verbosity count      verbosity
+```yaml
+- uses: nexthink-oss/ghup/actions/setup@v1
 ```
 
-Each `file-spec` provided as a positional argument or explicitly via the `--update` flag takes the form `<local-file-path>[:<remote-target-path>]`. Content is read from the local file `<local-file-path>` and written to `<remote-target-path>` (defaulting to `<local-file-path>` if not specified).
+## Configuration
 
-Each `file-path` provided to the `--delete` flag is a `<remote-target-path>`: the path to a file on the target repository:branch that should be deleted.
+`ghup` can be configured through:
 
-Unless `--force` is used, content that already matches the remote repository state is ignored.
+1. Command-line flags
+2. Environment variables (`GHUP_*`, with various fallbacks for CI tools)
+3. Configuration files (various formats supported)
 
-Note: Due to limitations in the GitHub V4 API, when the target branch does not exist, branch creation and content push will trigger two distinct "push" events.
+When run from a git repository, `ghup` automatically detects:
+- Repository owner and name from the GitHub remote
+- Current branch
+- Git user information for commit trailers
 
-#### Content Examples
+See [full documentation](docs/cmd/ghup.md) for details on configuration options.
 
-##### Idempotent file add/update
+## Basic Usage
 
-Update `.zshrc` in my `dotfiles` repo, adding if's missing and updating if-and-only-if changed:
+### Managing Content
 
-```console
-$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "chore: update zshrc"
-https://github.com/isometry/dotfiles/commit/15b8630c81a051c2b128c94e5796c5d9c2bc8846
-$ ghup content --owner=isometry --repo=dotfiles ~/.zshrc:.zshrc -m "chore: update zshrc"
-nothing to do
+```sh
+# Update a file
+ghup content -b feature-branch -u local/file.txt:remote/path.txt
+
+# Create a pull request with changes
+ghup content -b new-feature -u config.json --pr-title "Update configuration"
+
+# Add, update, and delete files in one commit
+ghup content -b updates \
+  -u local/new-file.txt:new-file.txt \
+  -d old-file.txt \
+  -c main:existing-file.txt:new-location.txt
 ```
 
-##### Idempotent file deletion
+See [content command documentation](docs/cmd/ghup_content.md) for more examples.
 
-Delete `.tcshrc` from my `dotfiles` repo:
+### Creating and Managing Tags
 
-```console
-$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "chore: remove tcshrc"
-https://github.com/isometry/dotfiles/commit/bf120a96c65cb482eacc3c9e27d2d0935d108eca
-$ ghup content --owner=isometry --repo=dotfiles --delete .tcshrc -m "chore: remove tcshrc"
-nothing to do
+```sh
+# Create an annotated tag
+ghup tag v1.0.0 --commitish main
+
+# Create a lightweight tag
+ghup tag v1.0.0 --lightweight
 ```
 
-### Tagging
+See [tag command documentation](docs/cmd/ghup_tag.md) for more examples.
 
-The `tag` verb is used to create lightweight or annotated tags without the need to checkout the target repository.
+### Updating References
 
-Note: annotated tags are the default, but only lightweight tags (i.e. `--lightweight`), which simply point at an existing commit, are "verified".
+```sh
+# Fast-forward a branch to match another
+ghup update-ref -s main refs/heads/production
 
-```console
-$ ghup tag --help
-
-Manage tags via the GitHub V3 API
-
-Usage:
-  ghup tag [flags] [<name>]
-
-Flags:
-  -h, --help          help for tag
-  -l, --lightweight   force lightweight tag
-      --tag string    tag name
-
-Global Flags:
-      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch name          target branch name (default "[local-branch-or-main]")
-  -f, --force                force action
-  -m, --message string       message (default "Commit via API")
-  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string         GitHub Token or path/to/token-file
-      --trailer key=value    extra key=value commit trailers (default [])
-      --user.email email     email for commit author trailer (default "[user.email]")
-      --user.name name       name for commit author trailer (default "[user.name]")
-  -v, --verbosity count      verbosity
+# Update GitHub Actions-style tags after a release
+ghup update-ref -s tags/v1.2.3 tags/v1.2 tags/v1
 ```
 
-#### Tagging Examples
+See [update-ref command documentation](docs/cmd/ghup_update-ref.md) for more examples.
 
-##### Create lightweight tag
+### Resolving Commits
 
-Create lightweight tag `v1.0.0` pointing at the head of the local repository's checked out branch:
+```sh
+# Resolve a branch to its SHA
+ghup resolve main
 
-```console
-$ ghup tag v1.0.0
-https://github.com/nexthink-oss/ghup/releases/tag/v1.0.0
+# Find all tags pointing to a specific commit
+ghup resolve abc123 --tags
 ```
 
-##### Create annotated tag
+See [resolve command documentation](docs/cmd/ghup_resolve.md) for more examples.
 
-Create an annotated repo `v1.0` pointed at the head of the `main` branch of the `ghup` repo owned by `nexthink-oss`:
+### Debugging
 
-```console
-$ ghup -o nexthink-oss -r ghup -b main tag v1.0 -m "Release v1.0!"
-https://github.com/nexthink-oss/ghup/releases/tag/v1.0
+```sh
+# View configuration and environment information
+ghup debug
 ```
 
-### Update Refs
+See [debug command documentation](docs/cmd/ghup_debug.md) for more details.
 
-The `update-ref` verb is used to update an arbitrary number `head` or `tag` references to match a source reference.
+## GitHub Actions
 
-The `source` may take the form of a partial commit hash, or of a fully- or partially-qualified reference, defaulting to a branch reference (`heads/…`; overrideable via `--source-type=tags`).
-The `target`(s) must take the form of fully- or partially-qualified references, defaulting to tag references, defaulting to tag references (`tags/…`; overrideable via `--target-type=heads`).
-The `--force` flag will override standard fast-forward-only protection on branch updates.
+`ghup` offers ready-to-use GitHub Actions to simplify integration within your workflows:
 
-```console
-$ ghup update-ref --help
-Update target refs to match source
+### Setup Action
 
-Usage:
-  ghup update-ref [flags] -s <source> <target> ...
+The [`nexthink-oss/ghup/actions/setup`](actions/setup/README.md) action installs `ghup` and makes it available in your workflow:
 
-Flags:
-  -s, --source ref-or-commit     source ref-or-commit
-  -S, --source-type heads|tags   unqualified source ref type (default heads)
-  -T, --target-type heads|tags   unqualified target ref type (default tags)
-  -h, --help                     help for update-ref
-
-Global Flags:
-      --author.trailer key   key for commit author trailer (blank to disable) (default "Co-Authored-By")
-  -b, --branch name          target branch name (default "[local-branch-or-main]")
-  -f, --force                force action
-  -m, --message string       message (default "Commit via API")
-  -o, --owner name           repository owner name (default "[owner-of-first-github-remote-or-required]")
-  -r, --repo name            repository name (default "[repo-of-first-github-remote-or-required]")
-      --token string         GitHub Token or path/to/token-file
-      --trailer key=value    extra key=value commit trailers (default [])
-      --user.email email     email for commit author trailer (default "[user.email]")
-      --user.name name       name for commit author trailer (default "[user.name]")
-  -v, --verbosity count      verbosity
+```yaml
+- uses: nexthink-oss/ghup/actions/setup@main
+  with:
+    version: v0.12.0 # optional, defaults to 'latest'
 ```
 
-Note: the `--branch`, `--message` and trailer-related flags are not used by the `ref` verb.
+### Fast-Forward Action
 
-#### Updated Refs Examples
+The [`nexthink-oss/ghup/actions/fast-forward`](actions/fast-forward/README.md) action updates refs to match a source commit:
 
-##### Fast-forward production branch to match staging
-
-```console
-$ ghup update-ref -s staging heads/production
-{"source":{"ref":"heads/staging","sha":"206e1a484f03cd320a2125a50aa73bd8a2b045dc"},"target":[{"ref":"heads/production","updated":true,"old_sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4","sha":"206e1a484f03cd320a2125a50aa73bd8a2b045dc"}]}
+```yaml
+- uses: nexthink-oss/ghup/actions/fast-forward@main
+  with:
+    source: main
+    target: refs/heads/production
+    # force: false # optional, defaults to false
+  env:
+    GITHUB_TOKEN: ${{ github.token }}
 ```
 
-##### Create a lightweight tag pointing at a specific commit
+Use this action to implement true fast-forward merges or to create/update tags from specific commits.
 
-```console
-$ ghup update-ref -s b7ccc4d example
-{"source":{"ref":"b7ccc4d","sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},"target":[{"ref":"tags/example","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"}]}
-```
+See individual action READMEs for detailed usage examples and parameters.
 
-##### Update GitHub Actions-style major and minor tags following patch release:
+## Documentation
 
-```console
-$ ghup update-ref -s tags/v1.1.7 v1.1 v1
-{"source":{"ref":"tags/v1.1.7","sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},"target":[{"ref":"tags/v1.1","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"},{"ref":"tags/v1","updated":true,"sha":"b7ccc4db9bc43551fd3571c260869f4c69aa2fd4"}]}
-```
+Detailed documentation for all commands is available in the [docs/cmd](docs/cmd) directory:
 
-### Debug Info
+- [`ghup`](docs/cmd/ghup.md): General command usage and configuration
+- [`ghup content`](docs/cmd/ghup_content.md): Managing repository content
+- [`ghup tag`](docs/cmd/ghup_tag.md): Creating and managing tags
+- [`ghup update-ref`](docs/cmd/ghup_update-ref.md): Updating git refs
+- [`ghup resolve`](docs/cmd/ghup_resolve.md): Resolving commit-ish references
+- [`ghup debug`](docs/cmd/ghup_debug.md): Debugging configuration and environment
 
-In order to better validate the configuration derived from context (working directory, environment variables and global flags), the `info` verb is available:
+## Contributing
 
-```console
-$ ghup info
-{
-  "has_token": true,
-  "owner": "nexthink-oss",
-  "repository": "ghup",
-  "branch": "feature/branch",
-  "commit": "5e1692253399bd9ea6077dba27e4cdc8a15b9720",
-  "clean": false,
-  "message": {
-    "headline": "Commit via API",
-    "body": "Co-Authored-By: Example User <user@example.com>"
-  }
-  "trailers": [
-    "Co-Authored-By: Example User <user@example.com>"
-  ],
-}
-```
+All contributions in the spirit of the project are welcome! Open an issue or pull request to get started.
