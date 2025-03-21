@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/apex/log"
 	"github.com/creasty/defaults"
@@ -22,10 +21,6 @@ type CommandOutput interface {
 }
 
 var (
-	version string = "snapshot"
-	commit  string = "unknown"
-	date    string = "unknown"
-
 	localRepo local.Repository
 
 	outputEncoder OutputEncoder
@@ -37,7 +32,6 @@ func New() *cobra.Command {
 		Short:             "Update GitHub content and tags via API",
 		SilenceUsage:      true,
 		PersistentPreRunE: commonSetup,
-		Version:           fmt.Sprintf("%s-%s (built %s)", version, commit, date),
 	}
 
 	// load defaults from local repository context, if available

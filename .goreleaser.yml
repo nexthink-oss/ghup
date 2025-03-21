@@ -13,9 +13,9 @@ builds:
     ldflags:
       - >-
         -s -w
-        -X github.com/nexthink-oss/ghup/cmd.version={{.Version}}
-        -X github.com/nexthink-oss/ghup/cmd.commit={{.ShortCommit}}
-        -X github.com/nexthink-oss/ghup/cmd.date={{.Date}}
+        -X main.version={{.Version}}
+        -X main.commit={{.ShortCommit}}
+        -X main.date={{.Date}}
     goos:
       - freebsd
       - windows
@@ -27,7 +27,8 @@ builds:
       - arm
       - arm64
 archives:
-  - format: zip
+  - formats:
+      - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 snapshot:
   version_template: "{{ .Tag }}-next"
