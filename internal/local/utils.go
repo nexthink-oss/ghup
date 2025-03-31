@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	InvalidSpecError        = errors.New("invalid spec")
-	NoBranchSpecError       = errors.New("empty branch spec")
-	InvalidBranchNameError  = errors.New("invalid branch spec")
-	EmptySourceSpecError    = errors.New("empty source spec")
-	EmptyTargetSpecError    = errors.New("empty target spec")
-	SourceEqualsTargetError = errors.New("source and target files are the same")
+	ErrInvalidSpec        = errors.New("invalid spec")
+	ErrNoBranchSpec       = errors.New("empty branch spec")
+	ErrInvalidBranchName  = errors.New("invalid branch spec")
+	ErrEmptySourceSpec    = errors.New("empty source spec")
+	ErrEmptyTargetSpec    = errors.New("empty target spec")
+	ErrSourceEqualsTarget = errors.New("source and target files are the same")
 )
 
 // ParseCopySpec parses a file specification into remote source andtarget file paths.
@@ -33,26 +33,26 @@ func ParseCopySpec(spec, separator string) (branch, source, target string, err e
 	case 3:
 		branch = parts[0]
 		if err := util.IsValidRefName(branch); err != nil {
-			errs = append(errs, InvalidBranchNameError)
+			errs = append(errs, ErrInvalidBranchName)
 		}
 
 		source = filepath.Clean(parts[1])
 		target = filepath.Clean(parts[2])
 
 	default:
-		errs = append(errs, InvalidSpecError)
+		errs = append(errs, ErrInvalidSpec)
 	}
 
 	if source == "" {
-		errs = append(errs, EmptySourceSpecError)
+		errs = append(errs, ErrEmptySourceSpec)
 	}
 
 	if target == "" {
-		errs = append(errs, EmptyTargetSpecError)
+		errs = append(errs, ErrEmptyTargetSpec)
 	}
 
 	if source == target {
-		errs = append(errs, SourceEqualsTargetError)
+		errs = append(errs, ErrSourceEqualsTarget)
 	}
 
 	if len(errs) > 0 {
@@ -80,15 +80,15 @@ func ParseUpdateSpec(spec, separator string) (source, target string, err error) 
 		target = filepath.Clean(files[1])
 
 	default:
-		errs = append(errs, InvalidSpecError)
+		errs = append(errs, ErrInvalidSpec)
 	}
 
 	if source == "" {
-		errs = append(errs, EmptySourceSpecError)
+		errs = append(errs, ErrEmptySourceSpec)
 	}
 
 	if target == "" {
-		errs = append(errs, EmptyTargetSpecError)
+		errs = append(errs, ErrEmptyTargetSpec)
 	}
 
 	if len(errs) > 0 {

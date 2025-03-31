@@ -45,7 +45,9 @@ func TestGithubActionsBranch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				if err := os.Setenv(key, value); err != nil {
+					t.Fatalf("os.Setenv(%v, %v) = %v", key, value, err)
+				}
 			}
 
 			result := GithubActionsBranch()
@@ -54,7 +56,9 @@ func TestGithubActionsBranch(t *testing.T) {
 			}
 
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%v) = %v", key, err)
+				}
 			}
 		})
 	}
@@ -120,7 +124,9 @@ func TestGithubActionsContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				if err := os.Setenv(key, value); err != nil {
+					t.Fatalf("os.Setenv(%v, %v) = %v", key, value, err)
+				}
 			}
 
 			result := GithubActionsContext()
@@ -133,7 +139,9 @@ func TestGithubActionsContext(t *testing.T) {
 			}
 
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%v) = %v", key, err)
+				}
 			}
 		})
 	}

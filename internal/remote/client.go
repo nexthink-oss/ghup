@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	NoMatchingObjectError = errors.New("no matching object found")
+	ErrNoMatchingObject = errors.New("no matching object found")
 )
 
 type Client struct {
@@ -158,10 +158,10 @@ func (c *Client) ResolveCommitish(commitish string) (sha string, err error) {
 
 	sha = string(query.Repository.Object.Commit.Oid)
 	if sha == "" {
-		err = NoMatchingObjectError
+		err = ErrNoMatchingObject
 	}
 
-	return sha, nil
+	return sha, err
 }
 
 type branchInfo struct {
@@ -288,7 +288,7 @@ func (c *Client) GetFileHashV4(branch string, path string) (hash string) {
 func (c *Client) GetRef(refName string) (*github.Reference, error) {
 	ref, resp, err := c.V3.Git.GetRef(c.context, c.repo.Owner, c.repo.Name, refName)
 	if err != nil && resp.StatusCode == http.StatusNotFound {
-		return nil, NoMatchingObjectError
+		return nil, ErrNoMatchingObject
 	}
 	return ref, err
 }
@@ -383,7 +383,7 @@ func (c *Client) GetTagObj(name string) (tagObj *TagObj, err error) {
 	}
 
 	if query.Repository.Ref == nil {
-		return nil, NoMatchingObjectError
+		return nil, ErrNoMatchingObject
 	}
 
 	switch tag := query.Repository.Ref.Target; tag.Typename {

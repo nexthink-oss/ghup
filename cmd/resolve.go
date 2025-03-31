@@ -44,7 +44,7 @@ func cmdResolve() *cobra.Command {
 	flags := cmd.Flags()
 
 	flags.String("commitish", "HEAD", "commitish to match")
-	flags.MarkHidden("commitish")
+	_ = flags.MarkHidden("commitish")
 	flags.BoolP("branches", "b", false, "list matching branches/heads")
 	flags.BoolP("tags", "t", false, "list matching tags")
 

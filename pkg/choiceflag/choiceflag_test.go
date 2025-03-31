@@ -41,7 +41,9 @@ func TestChoiceFlag_Set(t *testing.T) {
 
 func TestChoiceFlag_String(t *testing.T) {
 	cf := NewChoiceFlag([]string{"option1", "option2"})
-	cf.Set("option1")
+	if err := cf.Set("option1"); err != nil {
+		t.Errorf("Set() error = %v, want nil", err)
+	}
 	if cf.String() != "option1" {
 		t.Errorf("String() = %v, want %v", cf.String(), "option1")
 	}

@@ -47,8 +47,8 @@ func cmdTag() *cobra.Command {
 	flags.BoolP("lightweight", "l", false, "force lightweight tag")
 	flags.StringP("commitish", "c", localRepo.Branch, "target `commitish`")
 	addBranchFlag(flags)
-	flags.MarkDeprecated("branch", "pass commitish via -c/--commitish instead")
-	flags.MarkHidden("branch")
+	_ = flags.MarkDeprecated("branch", "pass commitish via -c/--commitish instead")
+	_ = flags.MarkHidden("branch")
 	addCommitMessageFlags(flags)
 	addForceFlag(flags)
 
@@ -118,7 +118,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 
 	tagRefName, err := util.QualifiedRefName(tagName, "tags")
 	if err != nil {
-		return fmt.Errorf("Invalid tag reference: %s: %w", tagRefName, err)
+		return fmt.Errorf("invalid tag reference: %s: %w", tagRefName, err)
 	}
 
 	log.Infof("checking tag reference: %s", tagRefName)
@@ -131,7 +131,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 	tagObj, err := client.GetTagObj(tagRefName)
 	if err != nil {
 		// tag does not exist, or other error
-		if !errors.Is(err, remote.NoMatchingObjectError) {
+		if !errors.Is(err, remote.ErrNoMatchingObject) {
 			return fmt.Errorf("GetTagObj(%s): %w", tagRefName, err)
 		}
 		log.Debug("tag does not exist")

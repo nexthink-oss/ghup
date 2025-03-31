@@ -61,14 +61,16 @@ and target refs via GHUP_TARGETS (space-delimited).`,
 	defaultSourceType := choiceflag.NewChoiceFlag(refTypes)
 	_ = defaultSourceType.Set("heads")
 	flags.VarP(defaultSourceType, "source-type", "S", "source ref type")
-	flags.MarkDeprecated("source-type", "prefer use of qualified commitish source")
-	flags.MarkHidden("source-type")
+	// Cobra prints deprecation warnings to stdout, breaking JSON :-/
+	// _ = flags.MarkDeprecated("source-type", "prefer use of qualified commitish source")
+	_ = flags.MarkHidden("source-type")
 
 	defaultTargetType := choiceflag.NewChoiceFlag(refTypes)
 	_ = defaultTargetType.Set("tags")
 	flags.VarP(defaultTargetType, "target-type", "T", "type for unqualified target ref")
-	flags.MarkDeprecated("target-type", "prefer fully-qualified target refs")
-	flags.MarkHidden("target-type")
+	// Cobra prints deprecation warnings to stdout, breaking JSON :-/
+	// _ = flags.MarkDeprecated("target-type", "prefer fully-qualified target refs")
+	_ = flags.MarkHidden("target-type")
 
 	addForceFlag(flags)
 

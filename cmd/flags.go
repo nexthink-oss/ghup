@@ -45,13 +45,13 @@ func bindEnvFlag(flag *pflag.Flag) {
 		args := make([]string, 1+len(flagConfig.Env))
 		args[0] = name
 		copy(args[1:], flagConfig.Env)
-		viper.BindEnv(args...)
+		_ = viper.BindEnv(args...)
 	}
 }
 
 func normalizeFlags(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 	// Normalize 'foo.bar' to 'foo-bar'
-	name = strings.Replace(name, ".", "-", -1)
+	name = strings.ReplaceAll(name, ".", "-")
 
 	// Support alternative flag names
 	switch name {

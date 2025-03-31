@@ -188,7 +188,7 @@ func (r *Repository) contentForIndexPath(idx *index.Index, path string) (content
 	if err != nil {
 		return nil, fmt.Errorf("reading blob for %q: %w", path, err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	return io.ReadAll(reader)
 }
