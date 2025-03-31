@@ -125,12 +125,6 @@ func TestAccContentCmd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
-	defer func() {
-		_ = os.Remove(file1)
-		_ = os.Remove(file2)
-		_ = os.Remove(file3)
-		_ = os.Remove(fileToDelete)
-	}()
 
 	// Generate a unique branch name for our tests
 	testBranch := "test-content-" + testRandomString(8)
