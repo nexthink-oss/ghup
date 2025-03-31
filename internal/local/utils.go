@@ -71,13 +71,12 @@ func ParseUpdateSpec(spec, separator string) (source, target string, err error) 
 
 	switch len(files) {
 	case 1:
-		clean := filepath.Clean(files[0])
-		source = clean
-		target = clean
+		source = files[0]
+		target = files[0]
 
 	case 2:
-		source = filepath.Clean(files[0])
-		target = filepath.Clean(files[1])
+		source = files[0]
+		target = files[1]
 
 	default:
 		errs = append(errs, ErrInvalidSpec)
@@ -92,7 +91,12 @@ func ParseUpdateSpec(spec, separator string) (source, target string, err error) 
 	}
 
 	if len(errs) > 0 {
+		source = ""
+		target = ""
 		err = fmt.Errorf("update-spec %q: %w", spec, errors.Join(errs...))
+	} else {
+		source = filepath.Clean(source)
+		target = filepath.Clean(target)
 	}
 
 	return source, target, err
