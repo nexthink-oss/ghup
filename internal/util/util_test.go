@@ -45,7 +45,9 @@ func TestGithubActionsBranch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				if err := os.Setenv(key, value); err != nil {
+					t.Fatalf("os.Setenv(%v, %v) = %v", key, value, err)
+				}
 			}
 
 			result := GithubActionsBranch()
@@ -54,7 +56,9 @@ func TestGithubActionsBranch(t *testing.T) {
 			}
 
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%v) = %v", key, err)
+				}
 			}
 		})
 	}
@@ -120,7 +124,9 @@ func TestGithubActionsContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for key, value := range tt.envVars {
-				os.Setenv(key, value)
+				if err := os.Setenv(key, value); err != nil {
+					t.Fatalf("os.Setenv(%v, %v) = %v", key, value, err)
+				}
 			}
 
 			result := GithubActionsContext()
@@ -133,7 +139,9 @@ func TestGithubActionsContext(t *testing.T) {
 			}
 
 			for key := range tt.envVars {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%v) = %v", key, err)
+				}
 			}
 		})
 	}
@@ -187,7 +195,7 @@ func TestIsCommitHash(t *testing.T) {
 	}
 }
 
-func TestNormalizeRefName(t *testing.T) {
+func TestQualifiedRefName(t *testing.T) {
 	tests := []struct {
 		name           string
 		refName        string
@@ -198,51 +206,47 @@ func TestNormalizeRefName(t *testing.T) {
 		{
 			name:           "Fully-qualified ref",
 			refName:        "refs/heads/main",
-			defaultPrefix:  "heads",
-			expectedOutput: "heads/main",
+			expectedOutput: "refs/heads/main",
 		},
 		{
 			name:           "Fully-qualified ref",
 			refName:        "refs/tags/v1.0.0",
-			defaultPrefix:  "tags",
-			expectedOutput: "tags/v1.0.0",
+			expectedOutput: "refs/tags/v1.0.0",
 		},
 		{
 			name:           "Partially-qualified ref",
 			refName:        "heads/main",
-			defaultPrefix:  "heads",
-			expectedOutput: "heads/main",
+			expectedOutput: "refs/heads/main",
 		},
 		{
 			name:           "Partially-qualified ref",
 			refName:        "tags/v1.0.0",
-			defaultPrefix:  "tags",
-			expectedOutput: "tags/v1.0.0",
+			expectedOutput: "refs/tags/v1.0.0",
 		},
 		{
 			name:           "Unqualified ref with heads default #1",
 			refName:        "main",
 			defaultPrefix:  "heads",
-			expectedOutput: "heads/main",
+			expectedOutput: "refs/heads/main",
 		},
 		{
 			name:           "Unqualified ref with heads default #2",
 			refName:        "feature/branch",
 			defaultPrefix:  "heads",
-			expectedOutput: "heads/feature/branch",
+			expectedOutput: "refs/heads/feature/branch",
 		},
 
 		{
 			name:           "Unqualified ref with tags default",
 			refName:        "v1.0.0",
 			defaultPrefix:  "tags",
-			expectedOutput: "tags/v1.0.0",
+			expectedOutput: "refs/tags/v1.0.0",
 		},
 		{
 			name:           "Partially-qualified ref with mismatched default prefix",
 			refName:        "heads/main",
 			defaultPrefix:  "tags",
-			expectedOutput: "heads/main",
+			expectedOutput: "refs/heads/main",
 		},
 		{
 			name:           "Invalid ref name with control characters",
@@ -289,13 +293,13 @@ func TestNormalizeRefName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := NormalizeRefName(tt.refName, tt.defaultPrefix)
+			result, err := QualifiedRefName(tt.refName, tt.defaultPrefix)
 			if (err != nil) != tt.expectedError {
-				t.Errorf("NormalizeRefName() error = %v, expectedError %v", err, tt.expectedError)
+				t.Errorf("QualifiedRefName() error = %v, expectedError %v", err, tt.expectedError)
 				return
 			}
 			if result != tt.expectedOutput {
-				t.Errorf("NormalizeRefName() = %v, expected %v", result, tt.expectedOutput)
+				t.Errorf("QualifiedRefName() = %v, expected %v", result, tt.expectedOutput)
 			}
 		})
 	}
@@ -304,64 +308,64 @@ func TestNormalizeRefName(t *testing.T) {
 func TestBuildCommitMessage(t *testing.T) {
 	tests := []struct {
 		name           string
-		viperSettings  map[string]interface{}
+		viperSettings  map[string]any
 		expectedOutput string
 	}{
 		{
 			name:           "No message and no trailers",
-			viperSettings:  map[string]interface{}{},
+			viperSettings:  map[string]any{},
 			expectedOutput: "",
 		},
 		{
 			name: "Only message",
-			viperSettings: map[string]interface{}{
+			viperSettings: map[string]any{
 				"message": "This is a commit message",
 			},
 			expectedOutput: "This is a commit message",
 		},
 		{
 			name: "Message with long title",
-			viperSettings: map[string]interface{}{
+			viperSettings: map[string]any{
 				"message": "This is a very long commit message title that exceeds seventy-two characters and should trigger a warning",
 			},
 			expectedOutput: "This is a very long commit message title that exceeds seventy-two characters and should trigger a warning",
 		},
 		{
 			name: "Message with trailers",
-			viperSettings: map[string]interface{}{
-				"message":        "This is a commit message",
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"message":      "This is a commit message",
+				"user-trailer": "Co-Authored-By",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 			},
 			expectedOutput: "This is a commit message\n\nCo-Authored-By: John Doe <john.doe@example.com>",
 		},
 		{
 			name: "Message with author trailer disabled",
-			viperSettings: map[string]interface{}{
-				"message":        "This is a commit message",
-				"author.trailer": "",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"message":      "This is a commit message",
+				"user-trailer": "",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 			},
 			expectedOutput: "This is a commit message",
 		},
 		{
 			name: "Only trailers",
-			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"user-trailer": "Co-Authored-By",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 			},
 			expectedOutput: "\nCo-Authored-By: John Doe <john.doe@example.com>",
 		},
 		{
 			name: "Multiple trailers",
-			viperSettings: map[string]interface{}{
-				"message":        "This is a commit message",
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"message":      "This is a commit message",
+				"user-trailer": "Co-Authored-By",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 				"trailer": map[string]string{
 					"Reviewed-By": "Jane Smith",
 				},
@@ -389,38 +393,38 @@ func TestBuildCommitMessage(t *testing.T) {
 func TestBuildTrailers(t *testing.T) {
 	tests := []struct {
 		name           string
-		viperSettings  map[string]interface{}
+		viperSettings  map[string]any
 		expectedOutput []string
 	}{
 		{
 			name:           "No trailers",
-			viperSettings:  map[string]interface{}{},
+			viperSettings:  map[string]any{},
 			expectedOutput: []string{},
 		},
 		{
 			name: "Author trailer only",
-			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"user-trailer": "Co-Authored-By",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 			},
 			expectedOutput: []string{"Co-Authored-By: John Doe <john.doe@example.com>"},
 		},
 		{
 			name: "Author trailer disabled",
-			viperSettings: map[string]interface{}{
-				"author.trailer": "",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"user-trailer": "",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 			},
 			expectedOutput: []string{},
 		},
 		{
 			name: "Multiple trailers",
-			viperSettings: map[string]interface{}{
-				"author.trailer": "Co-Authored-By",
-				"user.name":      "John Doe",
-				"user.email":     "john.doe@example.com",
+			viperSettings: map[string]any{
+				"user-trailer": "Co-Authored-By",
+				"user-name":    "John Doe",
+				"user-email":   "john.doe@example.com",
 				"trailer": map[string]string{
 					"Reviewed-By": "Jane Smith",
 				},
@@ -432,7 +436,7 @@ func TestBuildTrailers(t *testing.T) {
 		},
 		{
 			name: "Only additional trailers",
-			viperSettings: map[string]interface{}{
+			viperSettings: map[string]any{
 				"trailer": map[string]string{
 					"Reviewed-By":   "Jane Smith",
 					"Signed-Off-By": "Alice Johnson",

@@ -1,15 +1,14 @@
 package remote
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/shurcooL/githubv4"
 )
 
-func CommittableBranch(owner string, repo string, branch string) githubv4.CommittableBranch {
+func CommittableBranch(repo Repo, branch string) githubv4.CommittableBranch {
 	return githubv4.CommittableBranch{
-		RepositoryNameWithOwner: githubv4.NewString(githubv4.String(fmt.Sprintf("%s/%s", owner, repo))),
+		RepositoryNameWithOwner: githubv4.NewString(githubv4.String(repo.String())),
 		BranchName:              githubv4.NewString(githubv4.String(branch)),
 	}
 }
