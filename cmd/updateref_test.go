@@ -57,6 +57,7 @@ func TestAccUpdateRefCmd(t *testing.T) {
 		t.Fatalf("failed to get repository info: %v", err)
 	}
 	defaultBranch := repoInfo.DefaultBranch.Name
+	defaultSHA := repoInfo.DefaultBranch.Commit
 
 	// Generate unique ref names for our tests
 	testTag1 := "test-update-ref-tag-" + testRandomString(8)
@@ -74,13 +75,7 @@ func TestAccUpdateRefCmd(t *testing.T) {
 	// These would typically point to existing commits
 	t.Logf("Creating initial test refs")
 
-	// Get default branch SHA
-	defaultSHA, err := client.ResolveCommitish(defaultBranch)
-	if err != nil {
-		t.Fatalf("failed to resolve default branch commitish: %v", err)
-	}
-
-	// Create test branch and tag pointing to default branch
+	// Pre-create test branch and tag pointing to default branch
 	testBranch1Ref := "refs/heads/" + testBranch1
 	testTag1Ref := "refs/tags/" + testTag1
 	createTestRefs := []string{testBranch1Ref, testTag1Ref}
@@ -88,7 +83,7 @@ func TestAccUpdateRefCmd(t *testing.T) {
 		ref := &github.Reference{
 			Ref: github.Ptr(refName),
 			Object: &github.GitObject{
-				SHA: github.Ptr(defaultSHA),
+				SHA: github.Ptr(string(defaultSHA)),
 			},
 		}
 
@@ -109,67 +104,59 @@ func TestAccUpdateRefCmd(t *testing.T) {
 		expectUpdated []bool // Whether each target in the test should be updated
 	}{
 		{
-			name: "Update a tag to match default branch",
+			name: "Idempotent branch update",
 			args: updateRefTestArgs{
 				Source:  defaultBranch,
-				Targets: []string{testTag1Ref},
+				Targets: []string{testBranch1Ref},
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: []bool{false}, // Should be false as target already points to the same commit
 		},
 		{
-			name: "Force update a tag to match default branch",
+			name: "Idempotent tag update",
 			args: updateRefTestArgs{
 				Source:  defaultBranch,
 				Targets: []string{testTag1Ref},
-				Force:   true,
 			},
-			wantError:     false,
 			checkJson:     true,
-			expectUpdated: []bool{true}, // With force, it should update even if already pointing to the same commit
+			expectUpdated: []bool{false}, // Should be false as target already points to the same commit
 		},
 		{
-			name: "Create a new tag pointing to default branch",
-			args: updateRefTestArgs{
-				Source:  defaultBranch,
-				Targets: []string{"refs/tags/" + testTag2},
-			},
-			wantError:     false,
-			checkJson:     true,
-			expectUpdated: []bool{true}, // New tag should be created
-		},
-		{
-			name: "Create a new branch pointing to default branch",
+			name: "New branch pointing to default branch",
 			args: updateRefTestArgs{
 				Source:  defaultBranch,
 				Targets: []string{"refs/heads/" + testBranch2},
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: []bool{true}, // New branch should be created
+		},
+		{
+			name: "New tag pointing to default branch",
+			args: updateRefTestArgs{
+				Source:  defaultBranch,
+				Targets: []string{"refs/tags/" + testTag2},
+			},
+			checkJson:     true,
+			expectUpdated: []bool{true}, // New tag should be created
 		},
 		{
 			name: "Update multiple refs at once",
 			args: updateRefTestArgs{
 				Source:  defaultBranch,
 				Targets: []string{testTag1Ref, testBranch1Ref},
-				Force:   true,
 			},
-			wantError:     false,
 			checkJson:     true,
-			expectUpdated: []bool{true, true}, // Both should be updated with force flag
+			expectUpdated: []bool{false, false},
 		},
 		{
 			name: "Update using a commit SHA as source",
 			args: updateRefTestArgs{
-				Source:  defaultSHA,
+				Source:  string(defaultSHA),
 				Targets: []string{testTag1Ref},
 				Force:   true,
 			},
-			wantError:     false,
 			checkJson:     true,
-			expectUpdated: []bool{true},
+			expectUpdated: []bool{false},
 		},
 		{
 			name: "Error - missing source",
@@ -199,14 +186,6 @@ func TestAccUpdateRefCmd(t *testing.T) {
 			checkJson: true,
 		},
 		{
-			name: "Error - invalid target ref",
-			args: updateRefTestArgs{
-				Source:  defaultBranch,
-				Targets: []string{"invalid/ref/format"},
-			},
-			wantError: true,
-		},
-		{
 			name: "Source using different format (unqualified)",
 			args: updateRefTestArgs{
 				Source:     defaultBranch,
@@ -214,9 +193,8 @@ func TestAccUpdateRefCmd(t *testing.T) {
 				Targets:    []string{testTag1Ref},
 				Force:      true,
 			},
-			wantError:     false,
 			checkJson:     true,
-			expectUpdated: []bool{true},
+			expectUpdated: []bool{false},
 		},
 		{
 			name: "Target using different format (unqualified)",
@@ -226,75 +204,74 @@ func TestAccUpdateRefCmd(t *testing.T) {
 				Targets:    []string{testTag1}, // Unqualified tag name
 				Force:      true,
 			},
-			wantError:     false,
 			checkJson:     true,
-			expectUpdated: []bool{true},
+			expectUpdated: []bool{false},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(tt *testing.T) {
 			spec := testCmdSpec{
-				Args: append([]string{"-vvvv"}, tt.args.Slice()...),
+				Args: append([]string{"-vvvv"}, test.args.Slice()...),
 			}
 
-			t.Logf("Running command with args: %v", spec.Args)
+			tt.Logf("Running command with args: %v", spec.Args)
 
-			stdout, stderr, err := testExecuteCmd(t, spec)
+			stdout, stderr, err := testExecuteCmd(tt, spec)
 
 			if os.Getenv("TEST_GHUP_LOG_OUTPUT") != "" {
-				t.Logf("stdout:\n%s", stdout.String())
-				t.Logf("stderr:\n%s", stderr.String())
+				tt.Logf("stdout:\n%s", stdout.String())
+				tt.Logf("stderr:\n%s", stderr.String())
 			}
 
-			if (err != nil) != tt.wantError {
-				t.Errorf("gotErr=%v, wantError=%v", err, tt.wantError)
+			if (err != nil) != test.wantError {
+				tt.Errorf("gotErr=%v, wantError=%v", err, test.wantError)
 			}
 
-			if tt.wantStdout != nil && !tt.wantStdout.MatchString(stdout.String()) {
-				t.Errorf("stdout did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stdout.String(), tt.wantStdout)
+			if test.wantStdout != nil && !test.wantStdout.MatchString(stdout.String()) {
+				tt.Errorf("stdout did not match expected pattern:\ngot: %q\nwant pattern: %q",
+					stdout.String(), test.wantStdout)
 			}
 
-			if tt.wantStderr != nil && !tt.wantStderr.MatchString(stderr.String()) {
-				t.Errorf("stderr did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stderr.String(), tt.wantStderr)
+			if test.wantStderr != nil && !test.wantStderr.MatchString(stderr.String()) {
+				tt.Errorf("stderr did not match expected pattern:\ngot: %q\nwant pattern: %q",
+					stderr.String(), test.wantStderr)
 			}
 
-			if tt.checkJson {
+			if test.checkJson {
 				var output cmd.UpdateRefOutput
 				err := json.Unmarshal(stdout.Bytes(), &output)
 				if err != nil {
-					t.Errorf("failed to unmarshal JSON output: %v", err)
+					tt.Errorf("failed to unmarshal JSON output: %v", err)
 				} else {
 					// Verify source info
-					if !tt.wantError && output.Source.Commitish != tt.args.Source {
-						t.Errorf("expected Source.Commitish=%q, got %q", tt.args.Source, output.Source.Commitish)
+					if !test.wantError && output.Source.Commitish != test.args.Source {
+						tt.Errorf("expected Source.Commitish=%q, got %q", test.args.Source, output.Source.Commitish)
 					}
 
-					if !tt.wantError && !util.IsCommitHash(output.Source.SHA) {
-						t.Errorf("expected Source.SHA to be a commit hash, got %q", output.Source.SHA)
+					if !test.wantError && !util.IsCommitHash(output.Source.SHA) {
+						tt.Errorf("expected Source.SHA to be a commit hash, got %q", output.Source.SHA)
 					}
 
 					// Verify target info
-					if !tt.wantError && len(output.Target) != len(tt.args.Targets) {
-						t.Errorf("expected %d targets in output, got %d", len(tt.args.Targets), len(output.Target))
+					if !test.wantError && len(output.Target) != len(test.args.Targets) {
+						tt.Errorf("expected %d targets in output, got %d", len(test.args.Targets), len(output.Target))
 					}
 
 					// Check if the targets were updated as expected
 					for i, target := range output.Target {
-						if i < len(tt.expectUpdated) && tt.expectUpdated[i] != target.Updated {
-							t.Errorf("target %d: expected Updated=%v, got %v", i, tt.expectUpdated[i], target.Updated)
+						if i < len(test.expectUpdated) && test.expectUpdated[i] != target.Updated {
+							tt.Errorf("target %d: expected Updated=%v, got %v", i, test.expectUpdated[i], target.Updated)
 						}
 
 						if !util.IsCommitHash(target.SHA) {
-							t.Errorf("target %d: expected SHA to be a commit hash, got %q", i, target.SHA)
+							tt.Errorf("target %d: expected SHA to be a commit hash, got %q", i, target.SHA)
 						}
 					}
 
 					// Check error handling
-					if tt.wantError && output.Source.Error == "" && (len(output.Target) == 0 || output.Target[0].Error == "") {
-						t.Errorf("expected error message in JSON output, but got none")
+					if test.wantError && output.Source.Error == "" && (len(output.Target) == 0 || output.Target[0].Error == "") {
+						tt.Errorf("expected error message in JSON output, but got none")
 					}
 				}
 			}

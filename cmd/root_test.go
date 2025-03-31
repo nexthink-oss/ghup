@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"github.com/nexthink-oss/ghup/cmd"
 	"github.com/nexthink-oss/ghup/internal/remote"
 )
@@ -84,7 +86,7 @@ func setupTestEnvironment(t *testing.T) *remote.Client {
 
 	testBranch := cmp.Or(os.Getenv("TEST_GHUP_BRANCH"), "main")
 
-	t.Setenv("GHUP_TOKEN", testToken)
+	viper.Set("token", testToken)
 	t.Setenv("GHUP_OWNER", testOwner)
 	t.Setenv("GHUP_REPO", testRepo)
 	t.Setenv("GHUP_BRANCH", testBranch)

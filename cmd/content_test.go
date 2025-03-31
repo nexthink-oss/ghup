@@ -20,7 +20,7 @@ type contentTestArgs struct {
 	Copies         []string
 	Staged         bool
 	Tracked        bool
-	CreateBranch   bool
+	NoCreateBranch bool
 	BaseBranch     string
 	PRTitle        string
 	PRBody         string
@@ -66,7 +66,7 @@ func (s *contentTestArgs) Slice() []string {
 		args = append(args, "--tracked")
 	}
 
-	if !s.CreateBranch {
+	if s.NoCreateBranch {
 		args = append(args, "--create-branch=false")
 	}
 
@@ -125,6 +125,12 @@ func TestAccContentCmd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to write test file: %v", err)
 	}
+	defer func() {
+		_ = os.Remove(file1)
+		_ = os.Remove(file2)
+		_ = os.Remove(file3)
+		_ = os.Remove(fileToDelete)
+	}()
 
 	// Generate a unique branch name for our tests
 	testBranch := "test-content-" + testRandomString(8)
@@ -269,7 +275,7 @@ func TestAccContentCmd(t *testing.T) {
 				Updates: []string{
 					file1 + ":test-path/any-file.txt",
 				},
-				CreateBranch: false,
+				NoCreateBranch: true,
 			},
 			wantError:  true,
 			checkJson:  true,
@@ -305,56 +311,56 @@ func TestAccContentCmd(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(tt *testing.T) {
 			spec := testCmdSpec{
-				Args: append([]string{"-vvvv"}, tt.args.Slice()...),
+				Args: append([]string{"-vvvv"}, test.args.Slice()...),
 			}
 
-			t.Logf("Running command with args: %v", spec.Args)
+			tt.Logf("Running command with args: %v", spec.Args)
 
-			stdout, stderr, err := testExecuteCmd(t, spec)
+			stdout, stderr, err := testExecuteCmd(tt, spec)
 
 			if os.Getenv("TEST_GHUP_LOG_OUTPUT") != "" {
-				t.Logf("stdout:\n%s", stdout.String())
-				t.Logf("stderr:\n%s", stderr.String())
+				tt.Logf("stdout:\n%s", stdout.String())
+				tt.Logf("stderr:\n%s", stderr.String())
 			}
 
-			if (err != nil) != tt.wantError {
-				t.Errorf("gotErr=%v, wantError=%v", err, tt.wantError)
+			if (err != nil) != test.wantError {
+				tt.Errorf("gotErr=%v, wantError=%v", err, test.wantError)
 			}
 
-			if tt.wantStdout != nil && !tt.wantStdout.MatchString(stdout.String()) {
-				t.Errorf("stdout did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stdout.String(), tt.wantStdout)
+			if test.wantStdout != nil && !test.wantStdout.MatchString(stdout.String()) {
+				tt.Errorf("stdout did not match expected pattern:\ngot: %q\nwant pattern: %q",
+					stdout.String(), test.wantStdout)
 			}
 
-			if tt.wantStderr != nil && !tt.wantStderr.MatchString(stderr.String()) {
-				t.Errorf("stderr did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stderr.String(), tt.wantStderr)
+			if test.wantStderr != nil && !test.wantStderr.MatchString(stderr.String()) {
+				tt.Errorf("stderr did not match expected pattern:\ngot: %q\nwant pattern: %q",
+					stderr.String(), test.wantStderr)
 			}
 
-			if tt.checkJson {
+			if test.checkJson {
 				var output cmd.ContentOutput
 				err := json.Unmarshal(stdout.Bytes(), &output)
 				if err != nil {
-					t.Errorf("failed to unmarshal JSON output: %v", err)
+					tt.Errorf("failed to unmarshal JSON output: %v", err)
 				} else {
-					if output.Updated != tt.expectUpdated {
-						t.Errorf("expected Updated=%v, got %v", tt.expectUpdated, output.Updated)
+					if output.Updated != test.expectUpdated {
+						tt.Errorf("expected Updated=%v, got %v", test.expectUpdated, output.Updated)
 					}
 
-					if tt.wantError && output.ErrorMessage == "" {
-						t.Errorf("expected error message in JSON output, but got none")
+					if test.wantError && output.ErrorMessage == "" {
+						tt.Errorf("expected error message in JSON output, but got none")
 					}
 
-					if !tt.wantError && output.ErrorMessage != "" {
-						t.Errorf("unexpected error message in JSON output: %s", output.ErrorMessage)
+					if !test.wantError && output.ErrorMessage != "" {
+						tt.Errorf("unexpected error message in JSON output: %s", output.ErrorMessage)
 					}
 
 					// Check PR output if it was created
-					if tt.args.PRTitle != "" && output.PullRequest == nil {
-						t.Errorf("expected pull request info in output, but got none")
+					if test.args.PRTitle != "" && output.PullRequest == nil {
+						tt.Errorf("expected pull request info in output, but got none")
 					}
 				}
 			}

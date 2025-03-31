@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/go-github/v70/github"
+
 	"github.com/nexthink-oss/ghup/cmd"
 	"github.com/nexthink-oss/ghup/internal/util"
 )
@@ -37,77 +39,129 @@ func (s *resolveTestArgs) Slice() []string {
 }
 
 func TestAccResolveCmd(t *testing.T) {
-	setupTestResources(t) // Ensures GHUP_TOKEN, GHUP_OWNER, GHUP_REPO, etc. are set.
+	client, resources := setupTestResources(t)
+
+	// Generate a unique branch name for our tests
+	testBranch := "test-content-" + testRandomString(8)
+	testTag := "test-tag-" + testRandomString(8)
+	// Add to resources for cleanup
+	resources.AddBranch(testBranch)
+	resources.AddTag(testTag)
+
+	mainSha, err := client.ResolveCommitish("main")
+	if err != nil {
+		t.Fatalf("failed to resolve main commitish: %v", err)
+	}
+
+	// Create a new branch from main
+	_, _, err = client.UpdateRefName(
+		testBranch,
+		&github.Reference{
+			Ref:    github.String("refs/heads/" + testBranch),
+			Object: &github.GitObject{SHA: github.Ptr(mainSha)},
+		},
+		false,
+	)
+
+	// Create a new tag from main
+	_, _, err = client.UpdateRefName(
+		testTag,
+		&github.Reference{
+			Ref:    github.String("refs/tags/" + testTag),
+			Object: &github.GitObject{SHA: github.Ptr(mainSha)},
+		},
+		false,
+	)
 
 	tests := []struct {
 		name      string
 		args      resolveTestArgs
 		wantError bool
+		checkJson bool
 	}{
 		{
 			name: "Resolve plain commitish to SHA only",
-			args: resolveTestArgs{Commitish: "main"},
+			args: resolveTestArgs{
+				Commitish: "main",
+			},
+			checkJson: true,
 		},
 		{
 			name: "Resolve relative commitish to SHA only",
-			args: resolveTestArgs{Commitish: "main~1"},
+			args: resolveTestArgs{
+				Commitish: "main~1",
+			},
+			checkJson: true,
 		},
 		{
 			name: "Resolve commitish to SHA and list matching branches",
-			args: resolveTestArgs{Commitish: "main", Branches: true},
+			args: resolveTestArgs{
+				Commitish: "main",
+				Branches:  true,
+			},
+			checkJson: true,
 		},
 		{
 			name: "Resolve commitish to SHA and list matching tags",
-			args: resolveTestArgs{Commitish: "main", Tags: true},
+			args: resolveTestArgs{
+				Commitish: "main",
+				Tags:      true,
+			},
+			checkJson: true,
 		},
 		{
-			name:      "Resolve non-existing commitish",
-			args:      resolveTestArgs{Commitish: "thisdefinitelydoesnotexist"},
+			name: "Resolve non-existing commitish",
+			args: resolveTestArgs{
+				Commitish: "thisdefinitelydoesnotexist",
+			},
 			wantError: true,
+			checkJson: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(tt *testing.T) {
 			spec := testCmdSpec{
-				Args: append([]string{"-vvvv"}, tt.args.Slice()...),
+				Args: append([]string{"-vvvv"}, test.args.Slice()...),
 			}
 
-			t.Logf("args: %+v", spec.Args)
+			tt.Logf("args: %+v", spec.Args)
 
-			stdoutBuf, stderrBuf, err := testExecuteCmd(t, spec)
+			stdoutBuf, stderrBuf, err := testExecuteCmd(tt, spec)
 
 			stdout := stdoutBuf.Bytes()
 			stderr := stderrBuf.Bytes()
 
 			if os.Getenv("TEST_GHUP_LOG_OUTPUT") != "" {
-				t.Logf("stdout:\n%s", string(stdout))
-				t.Logf("stderr:\n%s", string(stderr))
+				tt.Logf("stdout:\n%s", string(stdout))
+				tt.Logf("stderr:\n%s", string(stderr))
 			}
 
-			if (err != nil) != tt.wantError {
-				t.Errorf("gotErr=%v, wantError=%v", err, tt.wantError)
+			if (err != nil) != test.wantError {
+				tt.Errorf("gotErr=%v, wantError=%v", err, test.wantError)
 			}
 
-			var output cmd.ResolveOutput
-			unmarshalErr := json.Unmarshal(stdout, &output)
-			if unmarshalErr != nil {
-				t.Errorf("failed to unmarshal output: %v", unmarshalErr)
-			} else {
-				if output.Commitish != tt.args.Commitish {
-					t.Errorf("unexpected commitish: got %q, want %q", output.Commitish, tt.args.Commitish)
-				}
-				if tt.wantError && output.ErrorMessage == "" {
-					t.Errorf("expected error message, got none")
-				}
-				if !tt.wantError && !util.IsCommitHash(output.SHA) {
-					t.Errorf("unexpected SHA: got %q", output.SHA)
-				}
-				if tt.args.Branches && len(output.Branches) == 0 {
-					t.Errorf("expected branches, got none")
-				}
-				if tt.args.Tags && len(output.Tags) == 0 {
-					t.Errorf("expected tags, got none")
+			if test.checkJson {
+				var output cmd.ResolveOutput
+				unmarshalErr := json.Unmarshal(stdout, &output)
+				if unmarshalErr != nil {
+					tt.Errorf("failed to unmarshal output: %v", unmarshalErr)
+				} else {
+					if output.Commitish != test.args.Commitish {
+						tt.Errorf("unexpected commitish: got %q, want %q", output.Commitish, test.args.Commitish)
+					}
+					if test.wantError && output.ErrorMessage == "" {
+						tt.Errorf("expected error message, got none")
+					}
+					if !test.wantError && !util.IsCommitHash(output.SHA) {
+						tt.Errorf("unexpected SHA: got %q", output.SHA)
+					}
+					if test.args.Branches && len(output.Branches) == 0 {
+						tt.Errorf("expected branches, got none")
+					}
+					if test.args.Tags && len(output.Tags) == 0 {
+						tt.Errorf("expected tags, got none")
+					}
 				}
 			}
 		})
