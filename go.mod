@@ -2,6 +2,8 @@ module github.com/nexthink-oss/ghup
 
 go 1.24.0
 
+toolchain go1.24.1
+
 require (
 	github.com/apex/log v1.9.0
 	github.com/chainguard-dev/git-urls v1.0.2
