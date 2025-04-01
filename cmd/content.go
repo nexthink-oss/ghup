@@ -109,6 +109,16 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	targetBranchIsNew := targetOid == ""
 
 	baseBranch := cmp.Or(viper.GetString("base-branch"), repoInfo.DefaultBranch.Name)
+	var baseBranchOid githubv4.GitObjectID
+	if baseBranch == repoInfo.DefaultBranch.Name {
+		baseBranchOid = repoInfo.DefaultBranch.Commit
+	} else {
+		baseBranchOid, err = client.GetRefOidV4(baseBranch)
+		if err != nil {
+			output.SetError(fmt.Errorf("getting oid for %q: %w", baseBranch, err))
+			return cmdOutput(cmd, output)
+		}
+	}
 
 	if targetBranchIsNew {
 		log.Debug("target branch is new")
@@ -118,16 +128,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			return cmdOutput(cmd, output)
 		}
 
-		// determine the oid for the target branch
-		if baseBranch == repoInfo.DefaultBranch.Name {
-			targetOid = repoInfo.DefaultBranch.Commit
-		} else {
-			targetOid, err = client.GetRefOidV4(baseBranch)
-			if err != nil {
-				output.SetError(fmt.Errorf("getting oid for %q: %w", baseBranch, err))
-				return cmdOutput(cmd, output)
-			}
-		}
+		targetOid = baseBranchOid
 
 		createRefInput := githubv4.CreateRefInput{
 			RepositoryID: repoInfo.NodeID,
@@ -249,11 +250,13 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	additions := util.MapValues(additionMap)
 	deletions := util.MapValues(deletionMap)
 
-	if len(additions) == 0 && len(deletions) == 0 {
-		output.SHA = string(repoInfo.TargetBranch.Commit)
+	noChanges := len(additions) == 0 && len(deletions) == 0
+
+	if noChanges {
+		log.Info("no changes to commit")
+		output.SHA = string(targetOid)
 		output.Updated = false
 	} else {
-
 		changes := githubv4.FileChanges{
 			Additions: &additions,
 			Deletions: &deletions,
@@ -283,7 +286,13 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		output.Updated = true
 	}
 
-	if prTitle := viper.GetString("pr-title"); prTitle != "" {
+	// if we created target branch and there were no changes, tidy up
+	if noChanges && targetBranchIsNew {
+		if err := client.DeleteRef(fmt.Sprintf("refs/heads/%s", targetBranch)); err != nil {
+			output.SetError(fmt.Errorf("deleting empty target branch %q: %w", targetBranch, err))
+			return cmdOutput(cmd, output)
+		}
+	} else if prTitle := viper.GetString("pr-title"); prTitle != "" && output.SHA != string(baseBranchOid) {
 		pullRequest := remote.PullRequest{
 			RepoId: repoInfo.NodeID,
 			Head:   targetBranch,
@@ -294,7 +303,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		var prExists bool
-		// check for existing pull request if target branch was pre-existing
+		// check for existing pull request only if target branch was pre-existing
 		if !targetBranchIsNew {
 			prExists, err = client.FindPullRequestUrl(&pullRequest)
 			if err != nil {

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/nexthink-oss/ghup/cmd"
@@ -128,6 +127,7 @@ func TestAccContentCmd(t *testing.T) {
 
 	// Generate a unique branch name for our tests
 	testBranch := "test-content-" + testRandomString(8)
+	noChangeTestBranch := "test-noop-branch-" + testRandomString(8)
 	// Add to resources for cleanup
 	resources.AddBranch(testBranch)
 
@@ -142,10 +142,9 @@ func TestAccContentCmd(t *testing.T) {
 		name          string
 		args          contentTestArgs
 		wantError     bool
-		wantStdout    *regexp.Regexp
-		wantStderr    *regexp.Regexp
 		checkJson     bool
 		expectUpdated bool
+		expectPR      bool
 	}{
 		{
 			name: "Create a new branch with content updates",
@@ -157,7 +156,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Initial content test commit",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -171,7 +169,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Same content should be idempotent",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: false, // Files have not changed, so expect no update
 		},
@@ -180,11 +177,10 @@ func TestAccContentCmd(t *testing.T) {
 			args: contentTestArgs{
 				Branch: testBranch,
 				Updates: []string{
-					file3 + ":test-path/file3.txt",
+					file3 + ":test-path/file2.txt",
 				},
-				Message: "Adding a third file",
+				Message: "Updating file2 with new content",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -197,7 +193,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Deleting the second file",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -210,7 +205,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Copying a file within the branch",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -223,7 +217,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Copying a file from the default branch",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -242,7 +235,6 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				Message: "Combined operation",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
 		},
@@ -257,13 +249,40 @@ func TestAccContentCmd(t *testing.T) {
 				PRBody:  "This PR was created by the acceptance test",
 				Message: "Update for PR creation",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true,
-			wantStdout:    regexp.MustCompile(`"pullrequest"`),
+			expectPR:      true,
 		},
 		{
-			name: "Try to update non-existent branch without create flag",
+			name: "PR creation is idempotent",
+			args: contentTestArgs{
+				Branch: testBranch,
+				Updates: []string{
+					file1 + ":test-path/update-for-pr.txt",
+				},
+				PRTitle: "Test PR from Content Command",
+				PRBody:  "This PR was created by the acceptance test",
+				Message: "Update for PR creation",
+			},
+			checkJson:     true,
+			expectUpdated: false, // No changes, so no update
+			expectPR:      true,
+		},
+		{
+			name: "No PR when there are no changes",
+			args: contentTestArgs{
+				BaseBranch: testBranch,
+				Branch:     noChangeTestBranch,
+				Updates: []string{
+					file1 + ":test-path/file1.txt",
+				},
+				PRTitle: "Test PR from Content Command",
+			},
+			checkJson:     true,
+			expectUpdated: false, // No changes, so no update
+		},
+		{
+			name: "Try to update non-existent branch with create-branch=false flag",
 			args: contentTestArgs{
 				Branch: "non-existent-branch-" + testRandomString(6),
 				Updates: []string{
@@ -271,9 +290,8 @@ func TestAccContentCmd(t *testing.T) {
 				},
 				NoCreateBranch: true,
 			},
-			wantError:  true,
-			checkJson:  true,
-			wantStdout: regexp.MustCompile(`"error":`),
+			wantError: true,
+			checkJson: true,
 		},
 		{
 			name: "Dry run mode should not create changes",
@@ -285,7 +303,6 @@ func TestAccContentCmd(t *testing.T) {
 				DryRun:  true,
 				Message: "This commit should not happen",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true, // The command returns true for updated, but no actual change happens
 		},
@@ -299,7 +316,6 @@ func TestAccContentCmd(t *testing.T) {
 				Force:   true,
 				Message: "Force update with same content",
 			},
-			wantError:     false,
 			checkJson:     true,
 			expectUpdated: true, // Force should cause an update even with identical content
 		},
@@ -324,16 +340,6 @@ func TestAccContentCmd(t *testing.T) {
 				tt.Errorf("gotErr=%v, wantError=%v", err, test.wantError)
 			}
 
-			if test.wantStdout != nil && !test.wantStdout.MatchString(stdout.String()) {
-				tt.Errorf("stdout did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stdout.String(), test.wantStdout)
-			}
-
-			if test.wantStderr != nil && !test.wantStderr.MatchString(stderr.String()) {
-				tt.Errorf("stderr did not match expected pattern:\ngot: %q\nwant pattern: %q",
-					stderr.String(), test.wantStderr)
-			}
-
 			if test.checkJson {
 				var output cmd.ContentOutput
 				err := json.Unmarshal(stdout.Bytes(), &output)
@@ -352,8 +358,7 @@ func TestAccContentCmd(t *testing.T) {
 						tt.Errorf("unexpected error message in JSON output: %s", output.ErrorMessage)
 					}
 
-					// Check PR output if it was created
-					if test.args.PRTitle != "" && output.PullRequest == nil {
+					if test.expectPR && output.PullRequest == nil {
 						tt.Errorf("expected pull request info in output, but got none")
 					}
 				}
