@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v70/github"
+	"github.com/google/go-github/v72/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 

@@ -10,7 +10,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
-	"github.com/google/go-github/v70/github"
+	"github.com/google/go-github/v72/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
