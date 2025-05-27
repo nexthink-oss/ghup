@@ -30,7 +30,7 @@ var flagConfigMap = FlagConfigMap{
 	"token":          {Env: []string{"GHUP_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"}},
 	"owner":          {Env: []string{"GHUP_OWNER", "GITHUB_OWNER", "GITHUB_REPOSITORY_OWNER"}},
 	"repo":           {Env: []string{"GHUP_REPO", "GITHUB_REPO", "GITHUB_REPOSITORY_NAME"}},
-	"branch":         {Env: []string{"GHUP_BRANCH", "CHANGE_BRANCH", "BRANCH_NAME", "GIT_BRANCH"}},
+	"branch":         {Env: []string{"GHUP_BRANCH", "CHANGE_BRANCH", "BRANCH_NAME"}},
 	"author-trailer": {Env: []string{"GHUP_AUTHOR_TRAILER", "GHUP_TRAILER_KEY"}},
 	"user-name":      {Env: []string{"GHUP_TRAILER_NAME", "GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"}},
 	"user-email":     {Env: []string{"GHUP_TRAILER_EMAIL", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"}},
