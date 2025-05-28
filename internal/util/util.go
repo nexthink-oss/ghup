@@ -47,7 +47,7 @@ func GetCliAuthToken() string {
 // GithubActionsBranch returns the branch name if running in a GitHub Actions environment, or an empty string
 func GithubActionsBranch() (branch string) {
 	if os.Getenv("GITHUB_REF_TYPE") == "branch" {
-		branch = cmp.Or[string](
+		branch = cmp.Or(
 			os.Getenv("GITHUB_HEAD_REF"), // PR context
 			os.Getenv("GITHUB_REF_NAME"), // other contexts
 		)
@@ -141,7 +141,7 @@ func QualifiedRefName(refName string, refType string) (string, error) {
 		return strings.Join([]string{"refs", refName}, "/"), nil
 	}
 
-	refType = cmp.Or[string](refType, "heads")
+	refType = cmp.Or(refType, "heads")
 	return strings.Join([]string{"refs", refType, refName}, "/"), nil
 }
 

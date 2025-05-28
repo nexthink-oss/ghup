@@ -47,18 +47,27 @@ func (r *Repository) SetDefaults() {
 		return
 	}
 
-	branchName := cmp.Or[string](head.Name().Short(), "main")
-	branch, err := repo.Branch(branchName)
-	if err != nil {
-		return
+	remoteName := "origin" // default remote name
+	r.Branch = "main"      // default branch name
+
+	// Try to parse the GIT_BRANCH environment variable set by CI/CD systems
+	if parts := strings.SplitN(os.Getenv("GIT_BRANCH"), "/", 2); len(parts) == 2 {
+		remoteName = parts[0]
+		r.Branch = parts[1]
+	} else if head.Name().IsBranch() {
+		branchName := head.Name().Short()
+		r.Branch = branchName
+
+		if branch, err := repo.Branch(branchName); err == nil {
+			remoteName = cmp.Or(branch.Remote, "origin")
+		}
 	}
 
-	r.Branch = branchName
-
-	remoteName := cmp.Or[string](branch.Remote, "origin")
-
-	remote, err := repo.Remote(remoteName)
-	if err == nil {
+	// Try to parse the GIT_URL environment variable set by CI/CD systems
+	if owner, name, ok := parseRemote(os.Getenv("GIT_URL")); ok {
+		r.Owner = owner
+		r.Name = name
+	} else if remote, err := repo.Remote(remoteName); err == nil {
 		remoteConfig := *remote.Config()
 		if owner, name, ok := parseRemote(remoteConfig.URLs[0]); ok {
 			r.Owner = owner
@@ -74,7 +83,7 @@ func (r *Repository) SetDefaults() {
 }
 
 func (r *Repository) HeadCommit() (hash string) {
-	if r.Repository == nil {
+	if r.Repository != nil {
 		head, err := r.Repository.Head()
 		if err == nil {
 			hash = head.Hash().String()
