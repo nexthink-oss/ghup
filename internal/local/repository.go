@@ -50,29 +50,31 @@ func (r *Repository) SetDefaults() {
 	remoteName := "origin" // default remote name
 	r.Branch = "main"      // default branch name
 
-	// Try to parse the GIT_BRANCH environment variable set by CI/CD systems
-	if parts := strings.SplitN(os.Getenv("GIT_BRANCH"), "/", 2); len(parts) == 2 {
-		remoteName = parts[0]
-		r.Branch = parts[1]
-	} else if head.Name().IsBranch() {
+	// Try to retrieve the branch name from the repository configuration
+	if head.Name().IsBranch() {
 		branchName := head.Name().Short()
 		r.Branch = branchName
 
 		if branch, err := repo.Branch(branchName); err == nil {
 			remoteName = cmp.Or(branch.Remote, "origin")
 		}
+	} else if parts := strings.SplitN(os.Getenv("GIT_BRANCH"), "/", 2); len(parts) == 2 {
+		// Fallback to the GIT_BRANCH environment variable set by CI/CD systems
+		remoteName = parts[0]
+		r.Branch = parts[1]
 	}
 
-	// Try to parse the GIT_URL environment variable set by CI/CD systems
-	if owner, name, ok := parseRemote(os.Getenv("GIT_URL")); ok {
-		r.Owner = owner
-		r.Name = name
-	} else if remote, err := repo.Remote(remoteName); err == nil {
+	// Try to retrieve the remote name from the repository configuration
+	if remote, err := repo.Remote(remoteName); err == nil {
 		remoteConfig := *remote.Config()
 		if owner, name, ok := parseRemote(remoteConfig.URLs[0]); ok {
 			r.Owner = owner
 			r.Name = name
 		}
+	} else if owner, name, ok := parseRemote(os.Getenv("GIT_URL")); ok {
+		// Fallback to the GIT_URL environment variable set by CI/CD systems
+		r.Owner = owner
+		r.Name = name
 	}
 
 	config, err := repo.ConfigScoped(config.GlobalScope)
