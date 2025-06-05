@@ -8,11 +8,11 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
+	"github.com/goccy/go-yaml"
 	"github.com/nexthink-oss/ghup/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 const envPrefix = "GHUP"
@@ -133,8 +133,7 @@ func commonSetup(cmd *cobra.Command, args []string) error {
 		}
 		outputEncoder = jsonEncoder
 	case "yaml", "y":
-		yamlEncoder := yaml.NewEncoder(cmd.OutOrStdout())
-		yamlEncoder.SetIndent(2)
+		yamlEncoder := yaml.NewEncoder(cmd.OutOrStdout(), yaml.Indent(2), yaml.IndentSequence(true))
 		outputEncoder = yamlEncoder
 	default:
 		errs = append(errs, errors.New("invalid output format"))
