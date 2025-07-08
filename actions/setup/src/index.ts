@@ -5,8 +5,6 @@ import * as tc from "@actions/tool-cache";
 import * as os from "os";
 import { Octokit } from "@octokit/rest";
 
-const github = new Octokit();
-
 if (require.main === module) {
   main().catch((err) => {
     console.error(err.stack);
@@ -18,7 +16,12 @@ async function main(): Promise<void> {
   try {
     const inputs = {
       version: core.getInput("version") || "latest",
+      token: core.getInput("token"),
     };
+
+    const github = new Octokit({
+      auth: inputs.token || undefined,
+    });
 
     const version =
       inputs.version === "latest"
@@ -40,7 +43,7 @@ async function main(): Promise<void> {
       }
 
       const ghupUrl = `https://github.com/nexthink-oss/ghup/releases/download/${version}/ghup_${version.slice(1)}_${platform}_${arch}.zip`;
-      const ghupZip = await tc.downloadTool(ghupUrl);
+      const ghupZip = await tc.downloadTool(ghupUrl, undefined, inputs.token ? `token ${inputs.token}` : undefined);
       const extractPath = await tc.extractZip(ghupZip);
       ghupPath = await tc.cacheFile(
         `${extractPath}/ghup`,

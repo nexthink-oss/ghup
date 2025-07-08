@@ -6,6 +6,10 @@ inputs:
     description: "Version of ghup to install"
     required: false
     default: "latest"
+  token:
+    description: "GitHub token for authentication"
+    required: false
+    default: ${{ github.token }}
 outputs:
   version:
     description: "Version of ghup installed"
