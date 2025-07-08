@@ -34053,7 +34053,6 @@ const core = __nccwpck_require__(7484);
 const tc = __nccwpck_require__(3472);
 const os = __nccwpck_require__(857);
 const rest_1 = __nccwpck_require__(9380);
-const github = new rest_1.Octokit();
 if (require.main === require.cache[eval('__filename')]) {
     main().catch((err) => {
         console.error(err.stack);
@@ -34064,7 +34063,11 @@ async function main() {
     try {
         const inputs = {
             version: core.getInput("version") || "latest",
+            token: core.getInput("token"),
         };
+        const github = new rest_1.Octokit({
+            auth: inputs.token || undefined,
+        });
         const version = inputs.version === "latest"
             ? await github.repos
                 .getLatestRelease({
@@ -34081,7 +34084,7 @@ async function main() {
                 arch = "amd64";
             }
             const ghupUrl = `https://github.com/nexthink-oss/ghup/releases/download/${version}/ghup_${version.slice(1)}_${platform}_${arch}.zip`;
-            const ghupZip = await tc.downloadTool(ghupUrl);
+            const ghupZip = await tc.downloadTool(ghupUrl, undefined, inputs.token ? `token ${inputs.token}` : undefined);
             const extractPath = await tc.extractZip(ghupZip);
             ghupPath = await tc.cacheFile(`${extractPath}/ghup`, "ghup", "ghup", version);
         }
