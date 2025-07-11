@@ -54,6 +54,7 @@ brew install isometry/tap/ghup
 3. Configuration files (various formats supported)
 
 When run from a git repository, `ghup` automatically detects:
+
 - Repository owner and name from the GitHub remote
 - Current branch
 - Git user information for commit trailers
@@ -70,6 +71,9 @@ ghup content -b feature-branch -u local/file.txt:remote/path.txt
 
 # Create a pull request with changes
 ghup content -b new-feature -u config.json --pr-title "Update configuration"
+
+# Create a pull request with auto-merge enabled (if repository supports it)
+ghup content -b feature-branch -u config.json --pr-title "Auto-merge update" --auto-merge
 
 # Add, update, and delete files in one commit
 ghup content -b updates \

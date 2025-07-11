@@ -37,6 +37,7 @@ var flagConfigMap = FlagConfigMap{
 	"pr-title":       {Env: []string{"GHUP_PR_TITLE"}},
 	"pr-body":        {Env: []string{"GHUP_PR_BODY"}},
 	"pr-draft":       {Env: []string{"GHUP_PR_DRAFT"}},
+	"auto-merge":     {Env: []string{"GHUP_AUTO_MERGE"}},
 }
 
 func bindEnvFlag(flag *pflag.Flag) {
@@ -166,4 +167,5 @@ func addPullRequestFlags(flagSet *pflag.FlagSet) {
 	flagSet.String("pr-title", "", "pull request title")
 	flagSet.String("pr-body", "", "pull request body")
 	flagSet.Bool("pr-draft", false, "create pull request in draft mode")
+	flagSet.Bool("auto-merge", false, "enable auto-merge for pull request (if repository allows it)")
 }

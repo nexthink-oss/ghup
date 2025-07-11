@@ -293,13 +293,22 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			return cmdOutput(cmd, output)
 		}
 	} else if prTitle := viper.GetString("pr-title"); prTitle != "" && output.SHA != string(baseBranchOid) {
+		autoMerge := viper.GetBool("auto-merge")
+
+		// Check if auto-merge is requested but not supported by the repository
+		if autoMerge && !repoInfo.AutoMergeAllowed {
+			log.Warnf("repository %s does not have auto-merge enabled; ignoring --auto-merge flag", repo)
+			autoMerge = false
+		}
+
 		pullRequest := remote.PullRequest{
-			RepoId: repoInfo.NodeID,
-			Head:   targetBranch,
-			Base:   baseBranch,
-			Title:  prTitle,
-			Body:   viper.GetString("pr-body"),
-			Draft:  viper.GetBool("pr-draft"),
+			RepoId:    repoInfo.NodeID,
+			Head:      targetBranch,
+			Base:      baseBranch,
+			Title:     prTitle,
+			Body:      viper.GetString("pr-body"),
+			Draft:     viper.GetBool("pr-draft"),
+			AutoMerge: autoMerge,
 		}
 
 		var prExists bool

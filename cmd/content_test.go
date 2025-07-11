@@ -24,6 +24,7 @@ type contentTestArgs struct {
 	PRTitle        string
 	PRBody         string
 	PRDraft        bool
+	AutoMerge      bool
 	Force          bool
 	DryRun         bool
 	Message        string
@@ -81,6 +82,10 @@ func (s *contentTestArgs) Slice() []string {
 		args = append(args, "--pr-draft")
 	}
 
+	if s.AutoMerge {
+		args = append(args, "--auto-merge")
+	}
+
 	if s.Force {
 		args = append(args, "--force")
 	}
@@ -130,6 +135,7 @@ func TestAccContentCmd(t *testing.T) {
 	noChangeTestBranch := "test-noop-branch-" + testRandomString(8)
 	// Add to resources for cleanup
 	resources.AddBranch(testBranch)
+	resources.AddBranch(testBranch + "-automerge")
 
 	// Get default branch for tests
 	repoInfo, err := client.GetRepositoryInfo("")
@@ -266,6 +272,22 @@ func TestAccContentCmd(t *testing.T) {
 			},
 			checkJson:     true,
 			expectUpdated: false, // No changes, so no update
+			expectPR:      true,
+		},
+		{
+			name: "Create a PR with auto-merge enabled",
+			args: contentTestArgs{
+				Branch: testBranch + "-automerge",
+				Updates: []string{
+					file1 + ":test-path/automerge-test.txt",
+				},
+				PRTitle:   "Test PR with Auto-merge",
+				PRBody:    "This PR was created with auto-merge enabled",
+				AutoMerge: true,
+				Message:   "Update for auto-merge PR test",
+			},
+			checkJson:     true,
+			expectUpdated: true,
 			expectPR:      true,
 		},
 		{

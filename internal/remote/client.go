@@ -39,14 +39,15 @@ func (r *Repo) String() string {
 }
 
 type PullRequest struct {
-	RepoId string `json:"-" yaml:"-"`
-	Number int    `json:"number,omitzero" yaml:"number,omitempty"`
-	Url    string `json:"url" yaml:"url"`
-	Head   string `json:"head" yaml:"head"`
-	Base   string `json:"base" yaml:"base"`
-	Draft  bool   `json:"draft" yaml:"draft"`
-	Title  string `json:"title" yaml:"title"`
-	Body   string `json:"-" yaml:"-"`
+	RepoId    string `json:"-" yaml:"-"`
+	Number    int    `json:"number,omitzero" yaml:"number,omitempty"`
+	Url       string `json:"url" yaml:"url"`
+	Head      string `json:"head" yaml:"head"`
+	Base      string `json:"base" yaml:"base"`
+	Draft     bool   `json:"draft" yaml:"draft"`
+	Title     string `json:"title" yaml:"title"`
+	Body      string `json:"-" yaml:"-"`
+	AutoMerge bool   `json:"auto_merge,omitempty" yaml:"auto_merge,omitempty"`
 }
 
 func NewClient(ctx context.Context, repo *Repo) (*Client, error) {
@@ -171,10 +172,11 @@ type branchInfo struct {
 }
 
 type repositoryInfo struct {
-	NodeID        string
-	IsEmpty       bool
-	DefaultBranch branchInfo
-	TargetBranch  branchInfo
+	NodeID           string
+	IsEmpty          bool
+	AutoMergeAllowed bool
+	DefaultBranch    branchInfo
+	TargetBranch     branchInfo
 }
 
 // GetRepositoryInfo returns information about a repository
@@ -183,6 +185,7 @@ func (c *Client) GetRepositoryInfo(branch string) (repository repositoryInfo, er
 		Repository struct {
 			Id               githubv4.String
 			IsEmpty          githubv4.Boolean
+			AutoMergeAllowed githubv4.Boolean
 			DefaultBranchRef struct {
 				Name   githubv4.String
 				Target struct {
@@ -209,8 +212,9 @@ func (c *Client) GetRepositoryInfo(branch string) (repository repositoryInfo, er
 	}
 
 	repository = repositoryInfo{
-		NodeID:  string(query.Repository.Id),
-		IsEmpty: bool(query.Repository.IsEmpty),
+		NodeID:           string(query.Repository.Id),
+		IsEmpty:          bool(query.Repository.IsEmpty),
+		AutoMergeAllowed: bool(query.Repository.AutoMergeAllowed),
 		DefaultBranch: branchInfo{
 			Name:   string(query.Repository.DefaultBranchRef.Name),
 			Commit: query.Repository.DefaultBranchRef.Target.Oid,
@@ -555,6 +559,7 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 			PullRequest struct {
 				Permalink githubv4.URI
 				Number    githubv4.Int
+				Id        githubv4.ID
 			}
 		} `graphql:"createPullRequest(input: $input)"`
 	}
@@ -577,7 +582,34 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 	pullRequest.Url = mutation.CreatePullRequest.PullRequest.Permalink.String()
 	pullRequest.Number = int(mutation.CreatePullRequest.PullRequest.Number)
 
+	// Enable auto-merge if requested
+	if pullRequest.AutoMerge {
+		err = c.enableAutoMerge(mutation.CreatePullRequest.PullRequest.Id)
+		if err != nil {
+			log.Warnf("failed to enable auto-merge for pull request #%d: %v", pullRequest.Number, err)
+			// Don't fail the entire operation if auto-merge fails
+			err = nil
+		}
+	}
+
 	return
+}
+
+// enableAutoMerge enables auto-merge for a pull request
+func (c *Client) enableAutoMerge(pullRequestId githubv4.ID) error {
+	var mutation struct {
+		EnablePullRequestAutoMerge struct {
+			PullRequest struct {
+				Id githubv4.ID
+			}
+		} `graphql:"enablePullRequestAutoMerge(input: $input)"`
+	}
+
+	input := githubv4.EnablePullRequestAutoMergeInput{
+		PullRequestID: pullRequestId,
+	}
+
+	return c.V4.Mutate(c.context, &mutation, input, nil)
 }
 
 func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, force bool) (oldHash string, newHash string, err error) {
