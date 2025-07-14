@@ -293,22 +293,30 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			return cmdOutput(cmd, output)
 		}
 	} else if prTitle := viper.GetString("pr-title"); prTitle != "" && output.SHA != string(baseBranchOid) {
-		autoMerge := viper.GetBool("auto-merge")
+		// Get auto-merge method, with backward compatibility
+		autoMergeMode := viper.GetString("pr-auto-merge")
 
 		// Check if auto-merge is requested but not supported by the repository
-		if autoMerge && !repoInfo.AutoMergeAllowed {
-			log.Warnf("repository %s does not have auto-merge enabled; ignoring --auto-merge flag", repo)
-			autoMerge = false
+		if autoMergeMode != remote.AutoMergeOff && !repoInfo.AutoMergeAllowed {
+			log.Warnf("repository %s does not have auto-merge enabled; ignoring --pr-auto-merge flag", repo)
+			autoMergeMode = remote.AutoMergeOff
+		}
+
+		// Check if the specific merge method is supported
+		if autoMergeMode != remote.AutoMergeOff && !repoInfo.IsAutoMergeMethodSupported(autoMergeMode) {
+			supportedMethods := repoInfo.GetSupportedAutoMergeMethods()
+			log.Warnf("repository %s does not support auto-merge method %q; supported methods: %v; using 'off'", repo, autoMergeMode, supportedMethods)
+			autoMergeMode = remote.AutoMergeOff
 		}
 
 		pullRequest := remote.PullRequest{
-			RepoId:    repoInfo.NodeID,
-			Head:      targetBranch,
-			Base:      baseBranch,
-			Title:     prTitle,
-			Body:      viper.GetString("pr-body"),
-			Draft:     viper.GetBool("pr-draft"),
-			AutoMerge: autoMerge,
+			RepoId:        repoInfo.NodeID,
+			Head:          targetBranch,
+			Base:          baseBranch,
+			Title:         prTitle,
+			Body:          viper.GetString("pr-body"),
+			Draft:         viper.GetBool("pr-draft"),
+			AutoMergeMode: autoMergeMode,
 		}
 
 		var prExists bool

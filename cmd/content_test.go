@@ -24,7 +24,7 @@ type contentTestArgs struct {
 	PRTitle        string
 	PRBody         string
 	PRDraft        bool
-	AutoMerge      bool
+	PRAutoMerge    string // New choice flag
 	Force          bool
 	DryRun         bool
 	Message        string
@@ -82,8 +82,8 @@ func (s *contentTestArgs) Slice() []string {
 		args = append(args, "--pr-draft")
 	}
 
-	if s.AutoMerge {
-		args = append(args, "--auto-merge")
+	if s.PRAutoMerge != "" {
+		args = append(args, "--pr-auto-merge", s.PRAutoMerge)
 	}
 
 	if s.Force {
@@ -135,7 +135,10 @@ func TestAccContentCmd(t *testing.T) {
 	noChangeTestBranch := "test-noop-branch-" + testRandomString(8)
 	// Add to resources for cleanup
 	resources.AddBranch(testBranch)
-	resources.AddBranch(testBranch + "-automerge")
+	resources.AddBranch(testBranch + "-squash")
+	resources.AddBranch(testBranch + "-rebase")
+	resources.AddBranch(testBranch + "-off")
+	resources.AddBranch(testBranch + "-compat")
 
 	// Get default branch for tests
 	repoInfo, err := client.GetRepositoryInfo("")
@@ -281,10 +284,58 @@ func TestAccContentCmd(t *testing.T) {
 				Updates: []string{
 					file1 + ":test-path/automerge-test.txt",
 				},
-				PRTitle:   "Test PR with Auto-merge",
-				PRBody:    "This PR was created with auto-merge enabled",
-				AutoMerge: true,
-				Message:   "Update for auto-merge PR test",
+				PRTitle:     "Test PR with Auto-merge",
+				PRBody:      "This PR was created with auto-merge enabled",
+				PRAutoMerge: "merge",
+				Message:     "Update for auto-merge PR test",
+			},
+			checkJson:     true,
+			expectUpdated: true,
+			expectPR:      true,
+		},
+		{
+			name: "Create a PR with squash auto-merge",
+			args: contentTestArgs{
+				Branch: testBranch + "-squash",
+				Updates: []string{
+					file1 + ":test-path/squash-test.txt",
+				},
+				PRTitle:     "Test PR with Squash Auto-merge",
+				PRBody:      "This PR was created with squash auto-merge enabled",
+				PRAutoMerge: "squash",
+				Message:     "Update for squash auto-merge PR test",
+			},
+			checkJson:     true,
+			expectUpdated: true,
+			expectPR:      true,
+		},
+		{
+			name: "Create a PR with rebase auto-merge",
+			args: contentTestArgs{
+				Branch: testBranch + "-rebase",
+				Updates: []string{
+					file1 + ":test-path/rebase-test.txt",
+				},
+				PRTitle:     "Test PR with Rebase Auto-merge",
+				PRBody:      "This PR was created with rebase auto-merge enabled",
+				PRAutoMerge: "rebase",
+				Message:     "Update for rebase auto-merge PR test",
+			},
+			checkJson:     true,
+			expectUpdated: true,
+			expectPR:      true,
+		},
+		{
+			name: "Create a PR with auto-merge off explicitly",
+			args: contentTestArgs{
+				Branch: testBranch + "-off",
+				Updates: []string{
+					file1 + ":test-path/off-test.txt",
+				},
+				PRTitle:     "Test PR with Auto-merge Off",
+				PRBody:      "This PR was created with auto-merge explicitly disabled",
+				PRAutoMerge: "off",
+				Message:     "Update for auto-merge off PR test",
 			},
 			checkJson:     true,
 			expectUpdated: true,

@@ -72,8 +72,11 @@ ghup content -b feature-branch -u local/file.txt:remote/path.txt
 # Create a pull request with changes
 ghup content -b new-feature -u config.json --pr-title "Update configuration"
 
-# Create a pull request with auto-merge enabled (if repository supports it)
-ghup content -b feature-branch -u config.json --pr-title "Auto-merge update" --auto-merge
+# Create a pull request with auto-merge using merge method
+ghup content -b feature-branch -u config.json --pr-title "Auto-merge update" --pr-auto-merge merge
+
+# Create a pull request with squash auto-merge
+ghup content -b feature-branch -u config.json --pr-title "Squash merge update" --pr-auto-merge squash
 
 # Add, update, and delete files in one commit
 ghup content -b updates \

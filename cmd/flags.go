@@ -9,7 +9,9 @@ import (
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
 	"github.com/goccy/go-yaml"
+	"github.com/nexthink-oss/ghup/internal/remote"
 	"github.com/nexthink-oss/ghup/internal/util"
+	"github.com/nexthink-oss/ghup/pkg/choiceflag"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -37,7 +39,7 @@ var flagConfigMap = FlagConfigMap{
 	"pr-title":       {Env: []string{"GHUP_PR_TITLE"}},
 	"pr-body":        {Env: []string{"GHUP_PR_BODY"}},
 	"pr-draft":       {Env: []string{"GHUP_PR_DRAFT"}},
-	"auto-merge":     {Env: []string{"GHUP_AUTO_MERGE"}},
+	"pr-auto-merge":  {Env: []string{"GHUP_PR_AUTO_MERGE"}},
 }
 
 func bindEnvFlag(flag *pflag.Flag) {
@@ -167,5 +169,9 @@ func addPullRequestFlags(flagSet *pflag.FlagSet) {
 	flagSet.String("pr-title", "", "pull request title")
 	flagSet.String("pr-body", "", "pull request body")
 	flagSet.Bool("pr-draft", false, "create pull request in draft mode")
-	flagSet.Bool("auto-merge", false, "enable auto-merge for pull request (if repository allows it)")
+
+	// Create choice flag for auto-merge
+	autoMergeFlag := choiceflag.NewChoiceFlag(remote.GetAutoMergeChoices())
+	_ = autoMergeFlag.Set(remote.AutoMergeOff) // Set default to "off"
+	flagSet.VarP(autoMergeFlag, "pr-auto-merge", "", "auto-merge method for pull request")
 }
