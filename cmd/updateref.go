@@ -74,6 +74,8 @@ and target refs via GHUP_TARGETS (space-delimited).`,
 
 	addForceFlag(flags)
 
+	flags.Bool("immutable", false, "skip update if target ref exists and does not match source ref")
+
 	flags.SetNormalizeFunc(normalizeFlags)
 	flags.SortFlags = false
 
@@ -93,6 +95,11 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		Name:  viper.GetString("repo"),
 	}
 	force := viper.GetBool("force")
+	immutable := viper.GetBool("immutable")
+
+	if force && immutable {
+		return errors.New("cannot use --force and --immutable together")
+	}
 
 	client, err := remote.NewClient(ctx, &repo)
 	if err != nil {
@@ -159,8 +166,18 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 			},
 		}
 
-		oldHash, newHash, err := client.UpdateRefName(targetRefName, targetRef, force)
+		oldHash, newHash, err := client.UpdateRefName(targetRefName, targetRef, force, immutable)
 		if err != nil {
+			var immutableErr *remote.ErrImmutableRef
+			if errors.As(err, &immutableErr) {
+				// For immutable refs that have diverged, we don't treat it as an error
+				// but we do report the existing and proposed hashes
+				targetReport.OldSHA = immutableErr.ExistingHash
+				targetReport.SHA = immutableErr.ProposedHash
+				targetReport.Updated = false
+				output.Target = append(output.Target, targetReport)
+				continue
+			}
 			updateRefErrors = append(updateRefErrors, fmt.Errorf("%s: %w", targetRefName, err))
 			targetReport.Error = err.Error()
 			output.Target = append(output.Target, targetReport)

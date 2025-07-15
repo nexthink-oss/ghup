@@ -35,6 +35,17 @@ func GetAutoMergeChoices() []string {
 	return []string{AutoMergeOff, AutoMergeMerge, AutoMergeSquash, AutoMergeRebase}
 }
 
+// ErrImmutableRef is returned when an update is skipped because the ref is immutable and has diverged
+type ErrImmutableRef struct {
+	RefName      string
+	ExistingHash string
+	ProposedHash string
+}
+
+func (e *ErrImmutableRef) Error() string {
+	return fmt.Sprintf("ref %s is immutable and has diverged (existing: %s, proposed: %s)", e.RefName, e.ExistingHash, e.ProposedHash)
+}
+
 type Client struct {
 	context context.Context
 	repo    *Repo
@@ -646,15 +657,30 @@ func (c *Client) enableAutoMerge(pullRequestId githubv4.ID, mergeMethod string) 
 	return c.V4.Mutate(c.context, &mutation, input, nil)
 }
 
-func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, force bool) (oldHash string, newHash string, err error) {
+func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, force bool, immutable bool) (oldHash string, newHash string, err error) {
 	legacyRef, _, err := c.V3.Git.GetRef(c.context, c.repo.Owner, c.repo.Name, refName)
 	if err != nil {
+		// Ref doesn't exist yet - create it (immutable flag has no effect on creation)
 		log.Infof("creating ref %q", refName)
 		updatedRef, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, targetRef)
 		if err != nil {
 			return "", "", err
 		}
 		return "", updatedRef.Object.GetSHA(), nil
+	}
+
+	// Check if immutable and ref has diverged
+	// Note: immutable only prevents updates to existing refs that point to different commits
+	existingHash := legacyRef.Object.GetSHA()
+	proposedHash := targetRef.Object.GetSHA()
+
+	if immutable && existingHash != proposedHash {
+		log.Infof("skipping update of ref %q (immutable and diverged: %s -> %s)", refName, existingHash, proposedHash)
+		return existingHash, proposedHash, &ErrImmutableRef{
+			RefName:      refName,
+			ExistingHash: existingHash,
+			ProposedHash: proposedHash,
+		}
 	}
 
 	log.Infof("updating ref %q", refName)
