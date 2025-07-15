@@ -2,6 +2,7 @@ package choiceflag
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -18,11 +19,9 @@ func (c *ChoiceFlag) String() string {
 
 // Set validates and sets the flag value
 func (c *ChoiceFlag) Set(value string) error {
-	for _, choice := range c.choices {
-		if value == choice {
-			c.value = value
-			return nil
-		}
+	if slices.Contains(c.choices, value) {
+		c.value = value
+		return nil
 	}
 	return fmt.Errorf("valid choices are: [%s]", strings.Join(c.choices, ", "))
 }
