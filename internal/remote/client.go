@@ -22,6 +22,19 @@ var (
 	ErrNoMatchingObject = errors.New("no matching object found")
 )
 
+// Auto-merge method constants
+const (
+	AutoMergeOff    = "off"
+	AutoMergeMerge  = "merge"
+	AutoMergeSquash = "squash"
+	AutoMergeRebase = "rebase"
+)
+
+// GetAutoMergeChoices returns the available auto-merge choices
+func GetAutoMergeChoices() []string {
+	return []string{AutoMergeOff, AutoMergeMerge, AutoMergeSquash, AutoMergeRebase}
+}
+
 type Client struct {
 	context context.Context
 	repo    *Repo
@@ -39,14 +52,15 @@ func (r *Repo) String() string {
 }
 
 type PullRequest struct {
-	RepoId string `json:"-" yaml:"-"`
-	Number int    `json:"number,omitzero" yaml:"number,omitempty"`
-	Url    string `json:"url" yaml:"url"`
-	Head   string `json:"head" yaml:"head"`
-	Base   string `json:"base" yaml:"base"`
-	Draft  bool   `json:"draft" yaml:"draft"`
-	Title  string `json:"title" yaml:"title"`
-	Body   string `json:"-" yaml:"-"`
+	RepoId        string `json:"-" yaml:"-"`
+	Number        int    `json:"number,omitzero" yaml:"number,omitempty"`
+	Url           string `json:"url" yaml:"url"`
+	Head          string `json:"head" yaml:"head"`
+	Base          string `json:"base" yaml:"base"`
+	Draft         bool   `json:"draft" yaml:"draft"`
+	Title         string `json:"title" yaml:"title"`
+	Body          string `json:"-" yaml:"-"`
+	AutoMergeMode string `json:"auto_merge_mode,omitempty" yaml:"auto_merge_mode,omitempty"`
 }
 
 func NewClient(ctx context.Context, repo *Repo) (*Client, error) {
@@ -171,19 +185,27 @@ type branchInfo struct {
 }
 
 type repositoryInfo struct {
-	NodeID        string
-	IsEmpty       bool
-	DefaultBranch branchInfo
-	TargetBranch  branchInfo
+	NodeID             string
+	IsEmpty            bool
+	AutoMergeAllowed   bool
+	MergeCommitAllowed bool
+	SquashMergeAllowed bool
+	RebaseMergeAllowed bool
+	DefaultBranch      branchInfo
+	TargetBranch       branchInfo
 }
 
 // GetRepositoryInfo returns information about a repository
 func (c *Client) GetRepositoryInfo(branch string) (repository repositoryInfo, err error) {
 	var query struct {
 		Repository struct {
-			Id               githubv4.String
-			IsEmpty          githubv4.Boolean
-			DefaultBranchRef struct {
+			Id                 githubv4.String
+			IsEmpty            githubv4.Boolean
+			AutoMergeAllowed   githubv4.Boolean
+			MergeCommitAllowed githubv4.Boolean
+			SquashMergeAllowed githubv4.Boolean
+			RebaseMergeAllowed githubv4.Boolean
+			DefaultBranchRef   struct {
 				Name   githubv4.String
 				Target struct {
 					Oid githubv4.GitObjectID
@@ -209,8 +231,12 @@ func (c *Client) GetRepositoryInfo(branch string) (repository repositoryInfo, er
 	}
 
 	repository = repositoryInfo{
-		NodeID:  string(query.Repository.Id),
-		IsEmpty: bool(query.Repository.IsEmpty),
+		NodeID:             string(query.Repository.Id),
+		IsEmpty:            bool(query.Repository.IsEmpty),
+		AutoMergeAllowed:   bool(query.Repository.AutoMergeAllowed),
+		MergeCommitAllowed: bool(query.Repository.MergeCommitAllowed),
+		SquashMergeAllowed: bool(query.Repository.SquashMergeAllowed),
+		RebaseMergeAllowed: bool(query.Repository.RebaseMergeAllowed),
 		DefaultBranch: branchInfo{
 			Name:   string(query.Repository.DefaultBranchRef.Name),
 			Commit: query.Repository.DefaultBranchRef.Target.Oid,
@@ -555,6 +581,7 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 			PullRequest struct {
 				Permalink githubv4.URI
 				Number    githubv4.Int
+				Id        githubv4.ID
 			}
 		} `graphql:"createPullRequest(input: $input)"`
 	}
@@ -577,7 +604,46 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 	pullRequest.Url = mutation.CreatePullRequest.PullRequest.Permalink.String()
 	pullRequest.Number = int(mutation.CreatePullRequest.PullRequest.Number)
 
+	// Enable auto-merge if requested
+	if pullRequest.AutoMergeMode != AutoMergeOff {
+		err = c.enableAutoMerge(mutation.CreatePullRequest.PullRequest.Id, pullRequest.AutoMergeMode)
+		if err != nil {
+			log.Warnf("failed to enable auto-merge for pull request #%d: %v", pullRequest.Number, err)
+			// Don't fail the entire operation if auto-merge fails
+			err = nil
+		}
+	}
+
 	return
+}
+
+func (c *Client) enableAutoMerge(pullRequestId githubv4.ID, mergeMethod string) error {
+	var mutation struct {
+		EnablePullRequestAutoMerge struct {
+			PullRequest struct {
+				Id githubv4.ID
+			}
+		} `graphql:"enablePullRequestAutoMerge(input: $input)"`
+	}
+
+	var apiMergeMethod githubv4.PullRequestMergeMethod
+	switch mergeMethod {
+	case AutoMergeMerge:
+		apiMergeMethod = githubv4.PullRequestMergeMethodMerge
+	case AutoMergeSquash:
+		apiMergeMethod = githubv4.PullRequestMergeMethodSquash
+	case AutoMergeRebase:
+		apiMergeMethod = githubv4.PullRequestMergeMethodRebase
+	default:
+		return fmt.Errorf("unsupported merge method: %s", mergeMethod)
+	}
+
+	input := githubv4.EnablePullRequestAutoMergeInput{
+		PullRequestID: pullRequestId,
+		MergeMethod:   &apiMergeMethod,
+	}
+
+	return c.V4.Mutate(c.context, &mutation, input, nil)
 }
 
 func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, force bool) (oldHash string, newHash string, err error) {
@@ -633,4 +699,36 @@ func (c *Client) GetMatchingTags(sha string) (tagNames []string, err error) {
 	}
 
 	return tagNames, nil
+}
+
+func (r *repositoryInfo) IsAutoMergeMethodSupported(method string) bool {
+	switch method {
+	case AutoMergeOff:
+		return true
+	case AutoMergeMerge:
+		return r.MergeCommitAllowed
+	case AutoMergeSquash:
+		return r.SquashMergeAllowed
+	case AutoMergeRebase:
+		return r.RebaseMergeAllowed
+	default:
+		return false
+	}
+}
+
+func (r *repositoryInfo) GetSupportedAutoMergeMethods() []string {
+	var methods []string
+	methods = append(methods, AutoMergeOff) // Always supported
+
+	if r.MergeCommitAllowed {
+		methods = append(methods, AutoMergeMerge)
+	}
+	if r.SquashMergeAllowed {
+		methods = append(methods, AutoMergeSquash)
+	}
+	if r.RebaseMergeAllowed {
+		methods = append(methods, AutoMergeRebase)
+	}
+
+	return methods
 }

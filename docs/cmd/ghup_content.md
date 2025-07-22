@@ -15,6 +15,7 @@ ghup content [flags] [<file-spec> ...]
 The `content` command allows you to add, update, or delete files in a GitHub repository through the GitHub API. This is especially useful in CI/CD pipelines where you need to make changes with proper commit verification status.
 
 When executing this command, `ghup` will:
+
 1. Create the target branch if it doesn't exist (unless `--create-branch=false`)
 2. Apply the specified file operations (additions, updates, deletions)
 3. Create a commit with the changes
@@ -42,6 +43,7 @@ File operations are idempotent by default - if a file already has the target con
       --pr-title string         pull request title
       --pr-body string          pull request body
       --pr-draft                create pull request in draft mode
+      --pr-auto-merge string    auto-merge method for pull request (off|merge|squash|rebase) (default "off")
   -n, --dry-run                 dry-run mode
   -f, --force                   force operation
   -h, --help                    help for content
@@ -58,6 +60,24 @@ ghup content -b new-feature \
   -u local/config.json:config.json \
   -u local/README.md:README.md \
   --pr-title "Update configuration and documentation"
+
+# Create a pull request with auto-merge enabled using merge method
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Auto-merge PR with merge commit" \
+  --pr-auto-merge merge
+
+# Create a pull request with squash auto-merge
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Auto-merge PR with squash" \
+  --pr-auto-merge squash
+
+# Create a pull request with rebase auto-merge
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Auto-merge PR with rebase" \
+  --pr-auto-merge rebase
 
 # Copy a file from another branch
 ghup content -b feature-branch -c main:existing/file.txt:new/location/file.txt
