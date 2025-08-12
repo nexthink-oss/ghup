@@ -310,7 +310,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			return cmdOutput(cmd, output)
 		}
 	} else if prTitle := viper.GetString("pr-title"); prTitle != "" && output.SHA != string(baseBranchOid) {
-		// Get auto-merge mode, with backward compatibility
+		// Get auto-merge method, with backward compatibility
 		autoMergeMode := viper.GetString("pr-auto-merge")
 
 		// Check if auto-merge is requested but not supported by the repository
