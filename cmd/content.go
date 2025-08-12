@@ -57,6 +57,7 @@ func cmdContent() *cobra.Command {
 	flags.StringSliceP("update", "u", []string{}, "file-spec to update (`local-path[<separator>remote-path]`)")
 	flags.StringSliceP("delete", "d", []string{}, "`remote-path` to delete")
 	flags.StringP("separator", "s", ":", "file-spec `separator`")
+	flags.Bool("allow-empty", false, "allow creating commits with no file changes")
 	addCommitMessageFlags(flags)
 	addBranchFlag(flags)
 	flags.Bool("create-branch", true, "create missing target branch")
@@ -251,15 +252,27 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	deletions := util.MapValues(deletionMap)
 
 	noChanges := len(additions) == 0 && len(deletions) == 0
+	allowEmpty := viper.GetBool("allow-empty")
 
-	if noChanges {
+	if noChanges && !allowEmpty {
 		log.Info("no changes to commit")
 		output.SHA = string(targetOid)
 		output.Updated = false
 	} else {
-		changes := githubv4.FileChanges{
-			Additions: &additions,
-			Deletions: &deletions,
+		var changes *githubv4.FileChanges
+		if !noChanges {
+			changes = &githubv4.FileChanges{
+				Additions: &additions,
+				Deletions: &deletions,
+			}
+		} else if allowEmpty {
+			// For empty commits, provide an empty FileChanges structure instead of nil
+			emptyAdditions := make([]githubv4.FileAddition, 0)
+			emptyDeletions := make([]githubv4.FileDeletion, 0)
+			changes = &githubv4.FileChanges{
+				Additions: &emptyAdditions,
+				Deletions: &emptyDeletions,
+			}
 		}
 
 		message := util.BuildCommitMessage()
@@ -268,7 +281,11 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			Branch:          remote.CommittableBranch(repo, targetBranch),
 			Message:         remote.CommitMessage(message),
 			ExpectedHeadOid: targetOid,
-			FileChanges:     &changes,
+			FileChanges:     changes,
+		}
+
+		if noChanges && allowEmpty {
+			log.Info("creating empty commit")
 		}
 
 		log.Debugf("CreateCommitOnBranchInput: %+v", input)
@@ -287,13 +304,13 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// if we created target branch and there were no changes, tidy up
-	if noChanges && targetBranchIsNew {
+	if noChanges && targetBranchIsNew && !allowEmpty {
 		if err := client.DeleteRef(fmt.Sprintf("refs/heads/%s", targetBranch)); err != nil {
 			output.SetError(fmt.Errorf("deleting empty target branch %q: %w", targetBranch, err))
 			return cmdOutput(cmd, output)
 		}
 	} else if prTitle := viper.GetString("pr-title"); prTitle != "" && output.SHA != string(baseBranchOid) {
-		// Get auto-merge method, with backward compatibility
+		// Get auto-merge mode, with backward compatibility
 		autoMergeMode := viper.GetString("pr-auto-merge")
 
 		// Check if auto-merge is requested but not supported by the repository
