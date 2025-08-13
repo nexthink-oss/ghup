@@ -251,28 +251,17 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	additions := util.MapValues(additionMap)
 	deletions := util.MapValues(deletionMap)
 
-	noChanges := len(additions) == 0 && len(deletions) == 0
+	numChanges := len(additions) + len(deletions)
 	allowEmpty := viper.GetBool("allow-empty")
 
-	if noChanges && !allowEmpty {
+	if numChanges == 0 && !allowEmpty {
 		log.Info("no changes to commit")
 		output.SHA = string(targetOid)
 		output.Updated = false
 	} else {
-		var changes *githubv4.FileChanges
-		if !noChanges {
-			changes = &githubv4.FileChanges{
-				Additions: &additions,
-				Deletions: &deletions,
-			}
-		} else if allowEmpty {
-			// For empty commits, provide an empty FileChanges structure instead of nil
-			emptyAdditions := make([]githubv4.FileAddition, 0)
-			emptyDeletions := make([]githubv4.FileDeletion, 0)
-			changes = &githubv4.FileChanges{
-				Additions: &emptyAdditions,
-				Deletions: &emptyDeletions,
-			}
+		changes := githubv4.FileChanges{
+			Additions: &additions,
+			Deletions: &deletions,
 		}
 
 		message := util.BuildCommitMessage()
@@ -281,10 +270,10 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			Branch:          remote.CommittableBranch(repo, targetBranch),
 			Message:         remote.CommitMessage(message),
 			ExpectedHeadOid: targetOid,
-			FileChanges:     changes,
+			FileChanges:     &changes,
 		}
 
-		if noChanges && allowEmpty {
+		if numChanges == 0 && allowEmpty {
 			log.Info("creating empty commit")
 		}
 
@@ -304,7 +293,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// if we created target branch and there were no changes, tidy up
-	if noChanges && targetBranchIsNew && !allowEmpty {
+	if targetBranchIsNew && numChanges == 0 && !allowEmpty {
 		if err := client.DeleteRef(fmt.Sprintf("refs/heads/%s", targetBranch)); err != nil {
 			output.SetError(fmt.Errorf("deleting empty target branch %q: %w", targetBranch, err))
 			return cmdOutput(cmd, output)
