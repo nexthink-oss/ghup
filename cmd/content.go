@@ -57,6 +57,7 @@ func cmdContent() *cobra.Command {
 	flags.StringSliceP("update", "u", []string{}, "file-spec to update (`local-path[<separator>remote-path]`)")
 	flags.StringSliceP("delete", "d", []string{}, "`remote-path` to delete")
 	flags.StringP("separator", "s", ":", "file-spec `separator`")
+	flags.Bool("allow-empty", false, "allow creating commits with no file changes")
 	addCommitMessageFlags(flags)
 	addBranchFlag(flags)
 	flags.Bool("create-branch", true, "create missing target branch")
@@ -250,9 +251,10 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	additions := util.MapValues(additionMap)
 	deletions := util.MapValues(deletionMap)
 
-	noChanges := len(additions) == 0 && len(deletions) == 0
+	numChanges := len(additions) + len(deletions)
+	allowEmpty := viper.GetBool("allow-empty")
 
-	if noChanges {
+	if numChanges == 0 && !allowEmpty {
 		log.Info("no changes to commit")
 		output.SHA = string(targetOid)
 		output.Updated = false
@@ -271,6 +273,10 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 			FileChanges:     &changes,
 		}
 
+		if numChanges == 0 && allowEmpty {
+			log.Info("creating empty commit")
+		}
+
 		log.Debugf("CreateCommitOnBranchInput: %+v", input)
 
 		if !dryRun {
@@ -287,7 +293,7 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// if we created target branch and there were no changes, tidy up
-	if noChanges && targetBranchIsNew {
+	if targetBranchIsNew && numChanges == 0 && !allowEmpty {
 		if err := client.DeleteRef(fmt.Sprintf("refs/heads/%s", targetBranch)); err != nil {
 			output.SetError(fmt.Errorf("deleting empty target branch %q: %w", targetBranch, err))
 			return cmdOutput(cmd, output)

@@ -27,6 +27,7 @@ type contentTestArgs struct {
 	PRAutoMerge    string // New choice flag
 	Force          bool
 	DryRun         bool
+	AllowEmpty     bool
 	Message        string
 	AdditionalArgs []string
 }
@@ -94,6 +95,10 @@ func (s *contentTestArgs) Slice() []string {
 		args = append(args, "--dry-run")
 	}
 
+	if s.AllowEmpty {
+		args = append(args, "--allow-empty")
+	}
+
 	args = append(args, s.AdditionalArgs...)
 
 	return args
@@ -133,12 +138,16 @@ func TestAccContentCmd(t *testing.T) {
 	// Generate a unique branch name for our tests
 	testBranch := "test-content-" + testRandomString(8)
 	noChangeTestBranch := "test-noop-branch-" + testRandomString(8)
+	emptyBranch := "test-empty-branch-" + testRandomString(8)
+	emptyPRBranch := "test-empty-pr-" + testRandomString(8)
 	// Add to resources for cleanup
 	resources.AddBranch(testBranch)
 	resources.AddBranch(testBranch + "-squash")
 	resources.AddBranch(testBranch + "-rebase")
 	resources.AddBranch(testBranch + "-off")
 	resources.AddBranch(testBranch + "-compat")
+	resources.AddBranch(emptyBranch)
+	resources.AddBranch(emptyPRBranch)
 
 	// Get default branch for tests
 	repoInfo, err := client.GetRepositoryInfo("")
@@ -391,6 +400,59 @@ func TestAccContentCmd(t *testing.T) {
 			},
 			checkJson:     true,
 			expectUpdated: true, // Force should cause an update even with identical content
+		},
+		{
+			name: "No changes without allow-empty should not create commit",
+			args: contentTestArgs{
+				Branch:  testBranch,
+				Message: "This should not create a commit",
+			},
+			checkJson:     true,
+			expectUpdated: false, // No changes and no allow-empty, so no update
+		},
+		{
+			name: "Empty commit with allow-empty flag should create commit",
+			args: contentTestArgs{
+				Branch:     testBranch,
+				AllowEmpty: true,
+				Message:    "This is an empty commit",
+			},
+			checkJson:     true,
+			expectUpdated: true, // Empty commit with allow-empty should create update
+		},
+		{
+			name: "Empty commit on new branch with allow-empty",
+			args: contentTestArgs{
+				Branch:     emptyBranch,
+				AllowEmpty: true,
+				Message:    "Empty commit on new branch",
+			},
+			checkJson:     true,
+			expectUpdated: true, // Should create new branch and empty commit
+		},
+		{
+			name: "Empty commit with PR creation",
+			args: contentTestArgs{
+				Branch:     emptyPRBranch,
+				AllowEmpty: true,
+				PRTitle:    "Test PR with Empty Commit",
+				PRBody:     "This PR was created with an empty commit",
+				Message:    "Empty commit for PR test",
+			},
+			checkJson:     true,
+			expectUpdated: true,
+			expectPR:      true, // Should create PR even with empty commit
+		},
+		{
+			name: "Dry run with allow-empty should not create commit",
+			args: contentTestArgs{
+				Branch:     testBranch,
+				AllowEmpty: true,
+				DryRun:     true,
+				Message:    "Dry run empty commit",
+			},
+			checkJson:     true,
+			expectUpdated: true, // Dry run returns true for updated but doesn't actually commit
 		},
 	}
 
