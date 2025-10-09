@@ -85,7 +85,7 @@ func IsValidRefName(refName string) error {
 	}
 
 	// They can include slash / for hierarchical (directory) grouping, but no slash-separated component can begin with a dot `.` or end with the sequence `.lock`.
-	for _, part := range strings.Split(refName, "/") {
+	for part := range strings.SplitSeq(refName, "/") {
 		if strings.HasPrefix(part, ".") {
 			return fmt.Errorf("no ref name component can begin with a dot: %s", refName)
 		}
