@@ -64,6 +64,7 @@ func (r *Repo) String() string {
 
 type PullRequest struct {
 	RepoId        string `json:"-" yaml:"-"`
+	Id            string `json:"-" yaml:"-"`
 	Number        int    `json:"number,omitzero" yaml:"number,omitempty"`
 	Url           string `json:"url" yaml:"url"`
 	Head          string `json:"head" yaml:"head"`
@@ -540,6 +541,7 @@ func (c *Client) FindPullRequestUrl(pullRequest *PullRequest) (found bool, err e
 		Repository struct {
 			PullRequests struct {
 				Nodes []struct {
+					Id                githubv4.ID
 					Number            githubv4.Int
 					Url               githubv4.String
 					Title             githubv4.String
@@ -571,6 +573,7 @@ func (c *Client) FindPullRequestUrl(pullRequest *PullRequest) (found bool, err e
 				continue // ignore cross-repository PRs
 			}
 
+			pullRequest.Id = fmt.Sprintf("%s", pr.Id)
 			pullRequest.Number = int(pr.Number)
 			pullRequest.Url = string(pr.Url)
 			pullRequest.Title = string(pr.Title)
@@ -626,6 +629,45 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 	}
 
 	return
+}
+
+func (c *Client) UpdatePullRequestV4(pullRequest *PullRequest) error {
+	var mutation struct {
+		UpdatePullRequest struct {
+			PullRequest struct {
+				Id    githubv4.ID
+				Title githubv4.String
+			}
+		} `graphql:"updatePullRequest(input: $input)"`
+	}
+
+	input := githubv4.UpdatePullRequestInput{
+		PullRequestID: githubv4.ID(pullRequest.Id),
+		Title:         githubv4.NewString(githubv4.String(pullRequest.Title)),
+	}
+
+	// Only set Body if non-empty to preserve existing PR body
+	if pullRequest.Body != "" {
+		body := githubv4.String(pullRequest.Body)
+		input.Body = &body
+	}
+
+	err := c.V4.Mutate(c.context, &mutation, input, nil)
+	if err != nil {
+		return err
+	}
+
+	// Handle auto-merge update if specified
+	if pullRequest.AutoMergeMode != AutoMergeOff {
+		err = c.enableAutoMerge(githubv4.ID(pullRequest.Id), pullRequest.AutoMergeMode)
+		if err != nil {
+			log.Warnf("failed to enable auto-merge for pull request #%d: %v", pullRequest.Number, err)
+			// Don't fail the entire operation if auto-merge fails
+			err = nil
+		}
+	}
+
+	return nil
 }
 
 func (c *Client) enableAutoMerge(pullRequestId githubv4.ID, mergeMethod string) error {

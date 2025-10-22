@@ -40,6 +40,7 @@ var flagConfigMap = FlagConfigMap{
 	"pr-body":        {Env: []string{"GHUP_PR_BODY"}},
 	"pr-draft":       {Env: []string{"GHUP_PR_DRAFT"}},
 	"pr-auto-merge":  {Env: []string{"GHUP_PR_AUTO_MERGE"}},
+	"pr-update":      {Env: []string{"GHUP_PR_UPDATE"}},
 }
 
 func bindEnvFlag(flag *pflag.Flag) {
@@ -174,4 +175,6 @@ func addPullRequestFlags(flagSet *pflag.FlagSet) {
 	autoMergeFlag := choiceflag.NewChoiceFlag(remote.GetAutoMergeChoices())
 	_ = autoMergeFlag.Set(remote.AutoMergeOff) // Set default to "off"
 	flagSet.VarP(autoMergeFlag, "pr-auto-merge", "", "auto-merge method for pull request")
+
+	flagSet.Bool("pr-update", false, "update existing pull request fields")
 }

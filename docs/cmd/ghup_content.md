@@ -44,6 +44,7 @@ File operations are idempotent by default - if a file already has the target con
       --pr-body string          pull request body
       --pr-draft                create pull request in draft mode
       --pr-auto-merge string    auto-merge method for pull request (off|merge|squash|rebase) (default "off")
+      --pr-update               update existing pull request fields
   -n, --dry-run                 dry-run mode
   -f, --force                   force operation
   -h, --help                    help for content
@@ -78,6 +79,27 @@ ghup content -b feature-branch \
   -u local/file.txt:remote/file.txt \
   --pr-title "Auto-merge PR with rebase" \
   --pr-auto-merge rebase
+
+# Update an existing pull request's title and body
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Updated: Complete implementation" \
+  --pr-body "Final changes including tests" \
+  --pr-update
+
+# Convert draft PR to ready for review
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Feature complete" \
+  --pr-draft=false \
+  --pr-update
+
+# Update PR and enable auto-merge
+ghup content -b feature-branch \
+  -u local/file.txt:remote/file.txt \
+  --pr-title "Ready to merge" \
+  --pr-auto-merge squash \
+  --pr-update
 
 # Copy a file from another branch
 ghup content -b feature-branch -c main:existing/file.txt:new/location/file.txt
