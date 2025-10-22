@@ -336,7 +336,32 @@ func runContentCmd(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		if prExists {
-			log.Debugf("found open pull request: %s", pullRequest.Url)
+			updatePR := viper.GetBool("pr-update")
+
+			if updatePR {
+				log.Infof("updating pull request #%d", pullRequest.Number)
+
+				// Set all fields to match current flags
+				pullRequest.Title = prTitle
+				pullRequest.Body = viper.GetString("pr-body")
+				pullRequest.Draft = viper.GetBool("pr-draft")
+				pullRequest.AutoMergeMode = autoMergeMode
+
+				if !dryRun {
+					err = client.UpdatePullRequestV4(&pullRequest)
+					if err != nil {
+						output.SetError(fmt.Errorf("updating pull request: %w", err))
+						return cmdOutput(cmd, output)
+					}
+					log.Infof("updated pull request: %s", pullRequest.Url)
+				} else {
+					log.Infof("dry-run: would update PR #%d (title: %q, draft: %v)",
+						pullRequest.Number, prTitle, pullRequest.Draft)
+				}
+			} else {
+				log.Debugf("found open pull request: %s", pullRequest.Url)
+			}
+
 			output.PullRequest = &pullRequest
 		} else {
 			if !dryRun {

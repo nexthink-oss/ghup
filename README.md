@@ -78,6 +78,9 @@ ghup content -b feature-branch -u config.json --pr-title "Auto-merge update" --p
 # Create a pull request with squash auto-merge
 ghup content -b feature-branch -u config.json --pr-title "Squash merge update" --pr-auto-merge squash
 
+# Update existing PR title with new commits
+ghup content -b feature-branch -u config.json --pr-title "Updated configuration" --pr-update
+
 # Add, update, and delete files in one commit
 ghup content -b updates \
   -u local/new-file.txt:new-file.txt \

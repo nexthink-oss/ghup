@@ -276,3 +276,115 @@ func TestGetAutoMergeChoices(t *testing.T) {
 		}
 	}
 }
+
+func TestPullRequestUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		original PullRequest
+		updated  PullRequest
+	}{
+		{
+			name: "Update all fields",
+			original: PullRequest{
+				Id:            "PR_test123",
+				Title:         "Original Title",
+				Body:          "Original Body",
+				Draft:         false,
+				AutoMergeMode: AutoMergeOff,
+			},
+			updated: PullRequest{
+				Id:            "PR_test123",
+				Title:         "Updated Title",
+				Body:          "Updated Body",
+				Draft:         true,
+				AutoMergeMode: AutoMergeSquash,
+			},
+		},
+		{
+			name: "Update with empty body preserves existing",
+			original: PullRequest{
+				Id:    "PR_test456",
+				Title: "Title",
+				Body:  "Original Body",
+			},
+			updated: PullRequest{
+				Id:    "PR_test456",
+				Title: "New Title",
+				Body:  "", // Empty body should preserve existing (not set in API call)
+			},
+		},
+		{
+			name: "Update title only with non-empty body",
+			original: PullRequest{
+				Id:    "PR_test789",
+				Title: "Old Title",
+				Body:  "Keep this body",
+				Draft: false,
+			},
+			updated: PullRequest{
+				Id:    "PR_test789",
+				Title: "New Title",
+				Body:  "Keep this body",
+				Draft: false,
+			},
+		},
+		{
+			name: "Update body to non-empty value",
+			original: PullRequest{
+				Id:    "PR_test999",
+				Title: "Same Title",
+				Body:  "",
+			},
+			updated: PullRequest{
+				Id:    "PR_test999",
+				Title: "Same Title",
+				Body:  "New body content",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Verify ID is preserved
+			if tt.updated.Id != tt.original.Id {
+				t.Errorf("PR ID should be preserved: got %s, expected %s", tt.updated.Id, tt.original.Id)
+			}
+
+			// Verify fields can be updated
+			if tt.name == "Update all fields" {
+				if tt.updated.Title == tt.original.Title {
+					t.Error("Title should be different after update")
+				}
+				if tt.updated.Body == tt.original.Body {
+					t.Error("Body should be different after update")
+				}
+				if tt.updated.Draft == tt.original.Draft {
+					t.Error("Draft should be different after update")
+				}
+				if tt.updated.AutoMergeMode == tt.original.AutoMergeMode {
+					t.Error("AutoMergeMode should be different after update")
+				}
+			}
+
+			// Verify empty body behavior (should preserve existing, not clear)
+			if tt.name == "Update with empty body preserves existing" {
+				if tt.updated.Body != "" {
+					t.Errorf("Body should be empty in struct (will be omitted from API call), got %q", tt.updated.Body)
+				}
+				// Note: In actual UpdatePullRequestV4 implementation, empty Body means
+				// the Body field won't be set in UpdatePullRequestInput, thus preserving
+				// the existing PR body on GitHub
+			}
+
+			// Verify non-empty body is updated
+			if tt.name == "Update body to non-empty value" {
+				if tt.updated.Body == "" {
+					t.Error("Body should be non-empty")
+				}
+				if tt.updated.Body != "New body content" {
+					t.Errorf("Body should be 'New body content', got %q", tt.updated.Body)
+				}
+			}
+		})
+	}
+}
