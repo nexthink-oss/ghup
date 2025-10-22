@@ -4,6 +4,7 @@
 package cmd_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"regexp"
@@ -20,6 +21,7 @@ type updateRefTestArgs struct {
 	TargetType     string
 	Targets        []string
 	Force          bool
+	Immutable      bool
 	AdditionalArgs []string
 }
 
@@ -42,6 +44,10 @@ func (s *updateRefTestArgs) Slice() []string {
 		args = append(args, "--force")
 	}
 
+	if s.Immutable {
+		args = append(args, "--immutable")
+	}
+
 	args = append(args, s.Targets...)
 	args = append(args, s.AdditionalArgs...)
 
@@ -59,15 +65,29 @@ func TestAccUpdateRefCmd(t *testing.T) {
 	defaultBranch := repoInfo.DefaultBranch.Name
 	defaultSHA := repoInfo.DefaultBranch.Commit
 
+	// Get parent commit for testing immutable flag with divergent commits
+	var parentSHA string
+	testOwner := os.Getenv("TEST_GHUP_OWNER")
+	testRepo := os.Getenv("TEST_GHUP_REPO")
+	commit, _, err := client.V3.Repositories.GetCommit(context.Background(), testOwner, testRepo, string(defaultSHA), nil)
+	if err != nil {
+		t.Logf("Warning: Could not get commit details: %v", err)
+	} else if len(commit.Parents) > 0 {
+		parentSHA = commit.Parents[0].GetSHA()
+		t.Logf("Found parent commit %s for default SHA %s", parentSHA, defaultSHA)
+	}
+
 	// Generate unique ref names for our tests
 	testTag1 := "test-update-ref-tag-" + testRandomString(8)
 	testTag2 := "test-update-ref-tag-" + testRandomString(8)
+	testTag3 := "test-update-ref-tag-" + testRandomString(8)
 	testBranch1 := "test-update-ref-branch-" + testRandomString(8)
 	testBranch2 := "test-update-ref-branch-" + testRandomString(8)
 
 	// Register resources for cleanup
 	resources.AddTag(testTag1)
 	resources.AddTag(testTag2)
+	resources.AddTag(testTag3)
 	resources.AddBranch(testBranch1)
 	resources.AddBranch(testBranch2)
 
@@ -78,6 +98,7 @@ func TestAccUpdateRefCmd(t *testing.T) {
 	// Pre-create test branch and tag pointing to default branch
 	testBranch1Ref := "refs/heads/" + testBranch1
 	testTag1Ref := "refs/tags/" + testTag1
+	testTag3Ref := "refs/tags/" + testTag3
 	createTestRefs := []string{testBranch1Ref, testTag1Ref}
 	for _, refName := range createTestRefs {
 		ref := &github.Reference{
@@ -92,6 +113,21 @@ func TestAccUpdateRefCmd(t *testing.T) {
 			t.Fatalf("failed to create test ref %s: %v", refName, err)
 		}
 		t.Logf("Created test ref %s pointing to %s", refName, defaultSHA)
+	}
+
+	// Create test tag pointing to parent commit for immutable divergence test
+	if parentSHA != "" {
+		ref := &github.Reference{
+			Ref: github.Ptr(testTag3Ref),
+			Object: &github.GitObject{
+				SHA: github.Ptr(parentSHA),
+			},
+		}
+		_, err := client.CreateRef(ref)
+		if err != nil {
+			t.Fatalf("failed to create test ref %s: %v", testTag3Ref, err)
+		}
+		t.Logf("Created test ref %s pointing to parent %s", testTag3Ref, parentSHA)
 	}
 
 	tests := []struct {
@@ -207,10 +243,56 @@ func TestAccUpdateRefCmd(t *testing.T) {
 			checkJson:     true,
 			expectUpdated: []bool{false},
 		},
+		{
+			name: "Immutable flag allows creating new refs",
+			args: updateRefTestArgs{
+				Source:    defaultBranch,
+				Targets:   []string{"refs/tags/" + testTag2},
+				Immutable: true,
+			},
+			checkJson:     true,
+			expectUpdated: []bool{true}, // New ref should be created even with immutable flag
+		},
+		{
+			name: "Immutable flag skips update when ref exists with same SHA",
+			args: updateRefTestArgs{
+				Source:    defaultBranch,
+				Targets:   []string{testBranch1Ref},
+				Immutable: true,
+			},
+			checkJson:     true,
+			expectUpdated: []bool{false}, // Ref already points to same commit
+		},
+		{
+			name: "Error - force and immutable flags conflict",
+			args: updateRefTestArgs{
+				Source:    defaultBranch,
+				Targets:   []string{testTag1Ref},
+				Force:     true,
+				Immutable: true,
+			},
+			wantError:  true,
+			wantStderr: regexp.MustCompile(`cannot use --force and --immutable together`),
+		},
+		{
+			name: "Immutable flag blocks update when commit would change",
+			args: updateRefTestArgs{
+				Source:    defaultBranch,         // This points to defaultSHA
+				Targets:   []string{testTag3Ref}, // This points to parentSHA
+				Immutable: true,
+			},
+			checkJson:     true,
+			expectUpdated: []bool{false}, // Should be skipped, not updated
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(tt *testing.T) {
+			// Skip divergent commit test if we don't have a parent SHA
+			if test.name == "Immutable flag blocks update when commit would change" && parentSHA == "" {
+				tt.Skip("Skipping divergent commit test: parent SHA not available")
+			}
+
 			spec := testCmdSpec{
 				Args: append([]string{"-vvvv"}, test.args.Slice()...),
 			}
@@ -266,6 +348,22 @@ func TestAccUpdateRefCmd(t *testing.T) {
 
 						if !util.IsCommitHash(target.SHA) {
 							tt.Errorf("target %d: expected SHA to be a commit hash, got %q", i, target.SHA)
+						}
+					}
+
+					// Special validation for divergent commit test
+					if test.name == "Immutable flag blocks update when commit would change" {
+						if len(output.Target) > 0 {
+							target := output.Target[0]
+							if target.OldSHA != parentSHA {
+								tt.Errorf("expected OldSHA=%q (parent), got %q", parentSHA, target.OldSHA)
+							}
+							if target.SHA != string(defaultSHA) {
+								tt.Errorf("expected SHA=%q (proposed), got %q", defaultSHA, target.SHA)
+							}
+							if target.Updated {
+								tt.Errorf("expected Updated=false for immutable diverged ref, got true")
+							}
 						}
 					}
 
