@@ -70,6 +70,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(
 		cmdContent(),
 		cmdDebug(),
+		cmdDeployment(),
 		cmdResolve(),
 		cmdTag(),
 		cmdUpdateRef(),

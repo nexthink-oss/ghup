@@ -50,6 +50,7 @@ The following environment variables can be used instead of command-line flags:
 ## Commands
 
 - [content](ghup_content.md) - Manage repository content
+- [deployment](ghup_deployment.md) - Create a deployment and deployment status
 - [tag](ghup_tag.md) - Create or update lightweight or annotated tags
 - [resolve](ghup_resolve.md) - Resolve a commit-ish to a SHA
 - [update-ref](ghup_update-ref.md) - Update target refs to match source commitish

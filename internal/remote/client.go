@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/apex/log"
@@ -799,4 +800,115 @@ func (r *repositoryInfo) GetSupportedAutoMergeMethods() []string {
 	}
 
 	return methods
+}
+
+// DeploymentInfo represents deployment information from GraphQL queries
+type DeploymentInfo struct {
+	ID          string
+	Environment string
+	State       string
+	SHA         string
+	Ref         string
+	Description string
+	CreatedAt   string
+	URL         string
+}
+
+// ListDeploymentsV3 lists deployments for a repository using REST API
+func (c *Client) ListDeploymentsV3(sha, environment string) ([]DeploymentInfo, error) {
+	opts := &github.DeploymentsListOptions{
+		Environment: environment,
+		ListOptions: github.ListOptions{PerPage: 10},
+	}
+
+	deployments, _, err := c.V3.Repositories.ListDeployments(c.context, c.repo.Owner, c.repo.Name, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	var deploymentInfos []DeploymentInfo
+	for _, deployment := range deployments {
+		// Filter by SHA if provided
+		if sha != "" && deployment.GetSHA() != sha {
+			continue
+		}
+
+		deploymentInfo := DeploymentInfo{
+			ID:          fmt.Sprintf("%d", deployment.GetID()),
+			Environment: deployment.GetEnvironment(),
+			State:       deployment.GetTask(),
+			SHA:         deployment.GetSHA(),
+			Ref:         deployment.GetRef(),
+			Description: deployment.GetDescription(),
+			CreatedAt:   deployment.GetCreatedAt().String(),
+			URL:         deployment.GetURL(),
+		}
+		deploymentInfos = append(deploymentInfos, deploymentInfo)
+	}
+
+	return deploymentInfos, nil
+}
+
+// CreateDeploymentV3 creates a deployment using REST API (hybrid approach)
+func (c *Client) CreateDeploymentV3(ref, environment, description string, transient, production bool) (*DeploymentInfo, error) {
+	deploymentReq := &github.DeploymentRequest{
+		Ref:                   &ref,
+		Environment:           &environment,
+		TransientEnvironment:  &transient,
+		ProductionEnvironment: &production,
+	}
+
+	if description != "" {
+		deploymentReq.Description = &description
+	}
+
+	deployment, _, err := c.V3.Repositories.CreateDeployment(c.context, c.repo.Owner, c.repo.Name, deploymentReq)
+	if err != nil {
+		return nil, err
+	}
+
+	deploymentInfo := &DeploymentInfo{
+		ID:          fmt.Sprintf("%d", deployment.GetID()),
+		Environment: deployment.GetEnvironment(),
+		State:       deployment.GetTask(),
+		SHA:         deployment.GetSHA(),
+		Ref:         deployment.GetRef(),
+		Description: deployment.GetDescription(),
+		CreatedAt:   deployment.GetCreatedAt().String(),
+		URL:         deployment.GetURL(),
+	}
+
+	return deploymentInfo, nil
+}
+
+// CreateDeploymentStatusV3 creates a deployment status using REST API (hybrid approach)
+func (c *Client) CreateDeploymentStatusV3(deploymentID, state, description, environment, environmentURL string) (int64, error) {
+	statusReq := &github.DeploymentStatusRequest{
+		State: &state,
+	}
+
+	if description != "" {
+		statusReq.Description = &description
+	}
+
+	if environment != "" {
+		statusReq.Environment = &environment
+	}
+
+	if environmentURL != "" {
+		statusReq.EnvironmentURL = &environmentURL
+	}
+
+	// Convert deploymentID string to int64
+	deploymentIDInt, err := strconv.ParseInt(deploymentID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid deployment ID: %w", err)
+	}
+
+	deploymentStatus, _, err := c.V3.Repositories.CreateDeploymentStatus(c.context, c.repo.Owner, c.repo.Name, deploymentIDInt, statusReq)
+	if err != nil {
+		return 0, err
+	}
+
+	return deploymentStatus.GetID(), nil
 }
