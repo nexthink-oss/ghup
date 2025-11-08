@@ -214,11 +214,11 @@ func TestAccDeploymentCmd(t *testing.T) {
 				tt.Errorf("unexpected error: got %v", executeErr)
 			}
 
-			if test.wantStderr != nil && !test.wantStderr.MatchString(string(stderr)) {
+			if test.wantStderr != nil && !test.wantStderr.Match(stderr) {
 				tt.Errorf("unexpected stderr: got %q, want %q", string(stderr), test.wantStderr)
 			}
 
-			if test.wantStdout != nil && !test.wantStdout.MatchString(string(stdout)) {
+			if test.wantStdout != nil && !test.wantStdout.Match(stdout) {
 				tt.Errorf("unexpected stdout: got %q, want %q", string(stdout), test.wantStdout)
 			}
 

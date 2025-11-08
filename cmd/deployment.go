@@ -134,7 +134,7 @@ func runDeploymentCmd(cmd *cobra.Command, args []string) error {
 		if len(deployments) > 0 {
 			// Use existing deployment
 			deployment = &deployments[0]
-			deploymentID = string(deployment.ID)
+			deploymentID = deployment.ID
 			log.Infof("using existing deployment: %s", deploymentID)
 		} else {
 			// Create new deployment
@@ -149,7 +149,7 @@ func runDeploymentCmd(cmd *cobra.Command, args []string) error {
 				return cmdOutput(cmd, output)
 			}
 
-			deploymentID = string(deployment.ID)
+			deploymentID = deployment.ID
 			output.Created = true
 			log.Infof("created deployment: %s", deploymentID)
 		}
