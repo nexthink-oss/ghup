@@ -126,6 +126,16 @@ ghup resolve abc123 --tags
 
 See [resolve command documentation](docs/cmd/ghup_resolve.md) for more examples.
 
+### Deployments
+
+```sh
+# Mark dev deployment as pending
+ghup deployment -c main --environment=dev/us-east-1 --state=pending
+
+# Mark production deployment as as succesful
+ghup deployment -c main --environment=prod/us-east-2 --state=success --production
+```
+
 ### Debugging
 
 ```sh
@@ -173,6 +183,7 @@ Detailed documentation for all commands is available in the [docs/cmd](docs/cmd)
 
 - [`ghup`](docs/cmd/ghup.md): General command usage and configuration
 - [`ghup content`](docs/cmd/ghup_content.md): Managing repository content
+- [`ghup deployment`](docs/cmd/ghup_deployment.md): Creating deployments and deployment statuses
 - [`ghup tag`](docs/cmd/ghup_tag.md): Creating and managing tags
 - [`ghup update-ref`](docs/cmd/ghup_update-ref.md): Updating git refs
 - [`ghup resolve`](docs/cmd/ghup_resolve.md): Resolving commit-ish references
