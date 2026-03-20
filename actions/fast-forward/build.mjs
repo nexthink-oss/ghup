@@ -12,5 +12,6 @@ await build({
   bundle: true,
   platform: "node",
   target: `node${nodeVersion}`,
+  format: "esm",
   outfile: "dist/index.js",
 });

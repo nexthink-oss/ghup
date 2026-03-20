@@ -1,15 +1,13 @@
-"use strict";
-
 import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
 import * as os from "os";
 import { Octokit } from "@octokit/rest";
 
-if (require.main === module) {
-  main().catch((err) => {
-    console.error(err.stack);
-    process.exit(1);
-  });
+try {
+  await main();
+} catch (err) {
+  console.error((err as Error).stack);
+  process.exit(1);
 }
 
 async function main(): Promise<void> {

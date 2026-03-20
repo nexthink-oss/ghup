@@ -1,5 +1,3 @@
-"use strict";
-
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as tc from "@actions/tool-cache";
@@ -8,11 +6,11 @@ import { Octokit } from "@octokit/rest";
 
 const github = new Octokit();
 
-if (require.main === module) {
-  main().catch((err) => {
-    console.error(err.stack);
-    process.exit(1);
-  });
+try {
+  await main();
+} catch (err) {
+  console.error((err as Error).stack);
+  process.exit(1);
 }
 
 async function main(): Promise<void> {
