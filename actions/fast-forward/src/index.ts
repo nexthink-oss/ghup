@@ -3,7 +3,7 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
 import * as tc from "@actions/tool-cache";
-import * as os from "os";
+import * as os from "node:os";
 import { Octokit } from "@octokit/rest";
 
 const github = new Octokit();
@@ -38,10 +38,7 @@ async function main(): Promise<void> {
 
     if (!ghupPath) {
       const platform = os.platform();
-      let arch = os.arch();
-      if (arch === "x64") {
-        arch = "amd64";
-      }
+      const arch: string = os.arch() === "x64" ? "amd64" : os.arch();
 
       const ghupUrl = `https://github.com/nexthink-oss/ghup/releases/download/${version}/ghup_${version.slice(1)}_${platform}_${arch}.zip`;
       const ghupZip = await tc.downloadTool(ghupUrl);
