@@ -31,6 +31,10 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          config: |
+            paths-ignore:
+              - "actions/*/dist"
+              - "actions/*/node_modules"
 
       - name: Setup Node.js (TypeScript)
         if: matrix.language == 'typescript'
