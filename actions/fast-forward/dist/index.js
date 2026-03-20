@@ -26722,10 +26722,7 @@ async function main() {
       force: getBooleanInput("force") || false,
       version: getInput("version") || "latest"
     };
-    const version = inputs.version === "latest" ? (await github.repos.getLatestRelease({
-      owner: "nexthink-oss",
-      repo: "ghup"
-    })).data.tag_name : inputs.version;
+    const version = inputs.version === "latest" ? await github.repos.getLatestRelease({ owner: "nexthink-oss", repo: "ghup" }).then((res) => res.data.tag_name) : inputs.version;
     let ghupPath = find("ghup", version);
     if (!ghupPath) {
       const platform3 = os7.platform();

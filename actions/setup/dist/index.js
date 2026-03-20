@@ -26628,10 +26628,7 @@ async function main() {
     const github = new Octokit2({
       auth: inputs.token || void 0
     });
-    const version = inputs.version === "latest" ? (await github.repos.getLatestRelease({
-      owner: "nexthink-oss",
-      repo: "ghup"
-    })).data.tag_name : inputs.version;
+    const version = inputs.version === "latest" ? await github.repos.getLatestRelease({ owner: "nexthink-oss", repo: "ghup" }).then((res) => res.data.tag_name) : inputs.version;
     let ghupPath = find("ghup", version);
     if (!ghupPath) {
       const platform3 = os7.platform();
