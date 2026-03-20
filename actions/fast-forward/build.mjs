@@ -15,4 +15,7 @@ await build({
   target: `node${nodeVersion}`,
   format: "esm",
   outfile: "dist/index.js",
+  banner: {
+    js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);',
+  },
 });

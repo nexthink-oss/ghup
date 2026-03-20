@@ -1,3 +1,4 @@
+import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -22979,7 +22980,7 @@ function _getGlobal(key, defaultValue) {
 }
 
 // src/index.ts
-import * as os7 from "os";
+import * as os7 from "node:os";
 
 // node_modules/universal-user-agent/index.js
 function getUserAgent() {
