@@ -37,10 +37,7 @@ async function main(): Promise<void> {
 
     if (!ghupPath) {
       const platform = os.platform();
-      let arch = os.arch();
-      if (arch === "x64") {
-        arch = "amd64";
-      }
+      const arch: string = os.arch() === "x64" ? "amd64" : os.arch();
 
       const ghupUrl = `https://github.com/nexthink-oss/ghup/releases/download/${version}/ghup_${version.slice(1)}_${platform}_${arch}.zip`;
       const ghupZip = await tc.downloadTool(ghupUrl, undefined, inputs.token ? `token ${inputs.token}` : undefined);
