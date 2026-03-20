@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["go"]
+        language: ["go", "typescript"]
 
     steps:
       - name: Checkout repository
