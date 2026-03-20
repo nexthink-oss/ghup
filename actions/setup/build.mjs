@@ -1,11 +1,12 @@
 import { build } from "esbuild";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const { engines } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)));
-const nodeVersion = engines.node.replace(/\D.*/, ""); // "24.x" → "24"
-
-const actionYaml = new URL("./action.yaml", import.meta.url);
-writeFileSync(actionYaml, readFileSync(actionYaml, "utf8").replace(/using: "node\d+"/, `using: "node${nodeVersion}"`));
+const nodeVersionMatch = engines.node.match(/\d+/); // e.g. "24.x" or ">=24" → ["24"]
+if (!nodeVersionMatch) {
+  throw new Error(`Unable to determine Node.js major version from engines.node: ${engines.node}`);
+}
+const nodeVersion = nodeVersionMatch[0];
 
 await build({
   entryPoints: ["src/index.ts"],

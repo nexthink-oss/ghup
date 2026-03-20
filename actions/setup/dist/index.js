@@ -26634,7 +26634,8 @@ async function main() {
     let ghupPath = find("ghup", version);
     if (!ghupPath) {
       const platform3 = os7.platform();
-      const arch4 = os7.arch() === "x64" ? "amd64" : os7.arch();
+      const rawArch = os7.arch();
+      const arch4 = rawArch === "x64" ? "amd64" : rawArch;
       const ghupUrl = `https://github.com/nexthink-oss/ghup/releases/download/${version}/ghup_${version.slice(1)}_${platform3}_${arch4}.zip`;
       const ghupZip = await downloadTool(ghupUrl, void 0, inputs.token ? `token ${inputs.token}` : void 0);
       const extractPath = await extractZip(ghupZip);

@@ -32,7 +32,22 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
+      - name: Setup Node.js (TypeScript)
+        if: matrix.language == 'typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Build TypeScript actions
+        if: matrix.language == 'typescript'
+        run: |
+          npm ci --prefix actions/fast-forward
+          npm run build --prefix actions/fast-forward
+          npm ci --prefix actions/setup
+          npm run build --prefix actions/setup
+
       - name: Autobuild
+        if: matrix.language != 'typescript'
         uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
