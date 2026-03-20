@@ -9,7 +9,11 @@ const github = new Octokit();
 try {
   await main();
 } catch (err) {
-  console.error((err as Error).stack);
+  if (err instanceof Error && err.stack) {
+    console.error(err.stack);
+  } else {
+    console.error(err);
+  }
   process.exit(1);
 }
 

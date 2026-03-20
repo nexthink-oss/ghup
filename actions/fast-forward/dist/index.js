@@ -26711,7 +26711,11 @@ var github = new Octokit2();
 try {
   await main();
 } catch (err) {
-  console.error(err.stack);
+  if (err instanceof Error && err.stack) {
+    console.error(err.stack);
+  } else {
+    console.error(err);
+  }
   process.exit(1);
 }
 async function main() {
