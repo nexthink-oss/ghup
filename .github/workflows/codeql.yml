@@ -36,7 +36,9 @@ jobs:
         if: matrix.language == 'typescript'
         uses: actions/setup-node@v4
         with:
-          node-version-file: .node-version
+          node-version: 24
+          cache: npm
+          cache-dependency-path: "actions/*/package-lock.json"
 
       - name: Build TypeScript actions
         if: matrix.language == 'typescript'
