@@ -24,12 +24,10 @@ async function main(): Promise<void> {
 
     const version =
       inputs.version === "latest"
-        ? await github.repos
-          .getLatestRelease({
-            owner: "nexthink-oss",
-            repo: "ghup",
-          })
-          .then((res) => res.data.tag_name)
+        ? (await github.repos.getLatestRelease({
+          owner: "nexthink-oss",
+          repo: "ghup",
+        })).data.tag_name
         : inputs.version;
 
     let ghupPath = tc.find("ghup", version);
