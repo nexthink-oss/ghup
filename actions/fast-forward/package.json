@@ -4,7 +4,7 @@
   "description": "Fast-Forward GitHub Refs",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc --noEmit && esbuild src/index.ts --bundle --platform=node --target=node24 --outfile=dist/index.js",
+    "build": "tsc --noEmit && node build.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
