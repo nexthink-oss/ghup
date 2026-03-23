@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["go"]
+        language: ["go", "javascript-typescript"]
 
     steps:
       - name: Checkout repository
@@ -31,8 +31,29 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          config: |
+            paths-ignore:
+              - "actions/*/dist"
+              - "actions/*/node_modules"
+
+      - name: Setup Node.js (TypeScript)
+        if: matrix.language == 'javascript-typescript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: "actions/*/package-lock.json"
+
+      - name: Build TypeScript actions
+        if: matrix.language == 'javascript-typescript'
+        run: |
+          npm ci --prefix actions/fast-forward
+          npm run build --prefix actions/fast-forward
+          npm ci --prefix actions/setup
+          npm run build --prefix actions/setup
 
       - name: Autobuild
+        if: matrix.language != 'javascript-typescript'
         uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
