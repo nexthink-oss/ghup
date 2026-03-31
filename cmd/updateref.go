@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -162,7 +162,7 @@ func runUpdateRefCmd(cmd *cobra.Command, args []string) (err error) {
 		targetRef := &github.Reference{
 			Ref: &targetRefName,
 			Object: &github.GitObject{
-				SHA: github.Ptr(commitSha),
+				SHA: new(commitSha),
 			},
 		}
 
