@@ -11,7 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
@@ -450,16 +450,14 @@ func (c *Client) GetTagObj(name string) (tagObj *TagObj, err error) {
 }
 
 func (c *Client) CreateTag(name, message, sha string) (*github.Tag, error) {
-	tag := &github.Tag{
-		Tag:     &name,
-		Message: &message,
-		Object: &github.GitObject{
-			Type: github.Ptr("commit"),
-			SHA:  github.Ptr(sha),
-		},
+	createTag := github.CreateTag{
+		Tag:     name,
+		Message: message,
+		Object:  sha,
+		Type:    "commit",
 	}
-	log.Debugf("Tag: %+v", tag)
-	tag, _, err := c.V3.Git.CreateTag(c.context, c.repo.Owner, c.repo.Name, tag)
+	log.Debugf("Tag: %+v", createTag)
+	tag, _, err := c.V3.Git.CreateTag(c.context, c.repo.Owner, c.repo.Name, createTag)
 	if err != nil {
 		return nil, fmt.Errorf("CreateTag(%s, %s): %w", c.repo, name, err)
 	}
@@ -469,7 +467,11 @@ func (c *Client) CreateTag(name, message, sha string) (*github.Tag, error) {
 
 func (c *Client) CreateRef(ref *github.Reference) (*github.Reference, error) {
 	log.Infof("CreateRef(%s, %s)", c.repo, ref.String())
-	ref, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, ref)
+	createRef := github.CreateRef{
+		Ref: ref.GetRef(),
+		SHA: ref.Object.GetSHA(),
+	}
+	ref, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, createRef)
 	if err != nil {
 		return nil, fmt.Errorf("CreateRef(%s, %s): %w", c.repo, ref.String(), err)
 	}
@@ -479,7 +481,11 @@ func (c *Client) CreateRef(ref *github.Reference) (*github.Reference, error) {
 
 func (c *Client) UpdateRef(ref *github.Reference, force bool) (*github.Reference, error) {
 	log.Infof("UpdateRef(%s, %s, %v)", c.repo, ref.String(), force)
-	ref, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, ref, force)
+	updateRef := github.UpdateRef{
+		SHA:   ref.Object.GetSHA(),
+		Force: new(force),
+	}
+	ref, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, ref.GetRef(), updateRef)
 	if err != nil {
 		return nil, fmt.Errorf("UpdateRef(%s, %s, %v): %w", c.repo, ref.String(), force, err)
 	}
@@ -584,7 +590,7 @@ func (c *Client) FindPullRequestUrl(pullRequest *PullRequest) (found bool, err e
 		if !query.Repository.PullRequests.PageInfo.HasNextPage {
 			break
 		}
-		variables["cursor"] = githubv4.NewString(query.Repository.PullRequests.PageInfo.EndCursor)
+		variables["cursor"] = new(query.Repository.PullRequests.PageInfo.EndCursor)
 	}
 
 	return false, nil
@@ -605,7 +611,7 @@ func (c *Client) CreatePullRequestV4(pullRequest *PullRequest) (err error) {
 	input := githubv4.CreatePullRequestInput{
 		RepositoryID: pullRequest.RepoId,
 		BaseRefName:  githubv4.String(pullRequest.Base),
-		Draft:        githubv4.NewBoolean(githubv4.Boolean(pullRequest.Draft)),
+		Draft:        new(githubv4.Boolean(pullRequest.Draft)),
 		HeadRefName:  githubv4.String(pullRequest.Head),
 		Title:        githubv4.String(pullRequest.Title),
 		Body:         &body,
@@ -644,7 +650,7 @@ func (c *Client) UpdatePullRequestV4(pullRequest *PullRequest) error {
 
 	input := githubv4.UpdatePullRequestInput{
 		PullRequestID: githubv4.ID(pullRequest.Id),
-		Title:         githubv4.NewString(githubv4.String(pullRequest.Title)),
+		Title:         new(githubv4.String(pullRequest.Title)),
 	}
 
 	// Only set Body if non-empty to preserve existing PR body
@@ -705,7 +711,11 @@ func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, forc
 	if err != nil {
 		// Ref doesn't exist yet - create it (immutable flag has no effect on creation)
 		log.Infof("creating ref %q", refName)
-		updatedRef, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, targetRef)
+		createRef := github.CreateRef{
+			Ref: targetRef.GetRef(),
+			SHA: targetRef.Object.GetSHA(),
+		}
+		updatedRef, _, err := c.V3.Git.CreateRef(c.context, c.repo.Owner, c.repo.Name, createRef)
 		if err != nil {
 			return "", "", err
 		}
@@ -727,7 +737,11 @@ func (c *Client) UpdateRefName(refName string, targetRef *github.Reference, forc
 	}
 
 	log.Infof("updating ref %q", refName)
-	updatedRef, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, targetRef, force)
+	updateRef := github.UpdateRef{
+		SHA:   targetRef.Object.GetSHA(),
+		Force: new(force),
+	}
+	updatedRef, _, err := c.V3.Git.UpdateRef(c.context, c.repo.Owner, c.repo.Name, targetRef.GetRef(), updateRef)
 	if err != nil {
 		return "", "", err
 	}

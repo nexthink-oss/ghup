@@ -1,5 +1,4 @@
 //go:build acceptance
-// +build acceptance
 
 package cmd_test
 
@@ -10,7 +9,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/nexthink-oss/ghup/cmd"
 	"github.com/nexthink-oss/ghup/internal/util"
 )
@@ -102,9 +101,9 @@ func TestAccUpdateRefCmd(t *testing.T) {
 	createTestRefs := []string{testBranch1Ref, testTag1Ref}
 	for _, refName := range createTestRefs {
 		ref := &github.Reference{
-			Ref: github.Ptr(refName),
+			Ref: new(refName),
 			Object: &github.GitObject{
-				SHA: github.Ptr(string(defaultSHA)),
+				SHA: new(string(defaultSHA)),
 			},
 		}
 
@@ -118,9 +117,9 @@ func TestAccUpdateRefCmd(t *testing.T) {
 	// Create test tag pointing to parent commit for immutable divergence test
 	if parentSHA != "" {
 		ref := &github.Reference{
-			Ref: github.Ptr(testTag3Ref),
+			Ref: new(testTag3Ref),
 			Object: &github.GitObject{
-				SHA: github.Ptr(parentSHA),
+				SHA: new(parentSHA),
 			},
 		}
 		_, err := client.CreateRef(ref)

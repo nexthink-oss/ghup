@@ -1,5 +1,4 @@
 //go:build acceptance
-// +build acceptance
 
 package cmd_test
 
@@ -8,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v84/github"
 
 	"github.com/nexthink-oss/ghup/cmd"
 	"github.com/nexthink-oss/ghup/internal/util"
@@ -57,9 +56,10 @@ func TestAccResolveCmd(t *testing.T) {
 	_, _, err = client.UpdateRefName(
 		testBranch,
 		&github.Reference{
-			Ref:    github.String("refs/heads/" + testBranch),
-			Object: &github.GitObject{SHA: github.Ptr(mainSha)},
+			Ref:    new("refs/heads/" + testBranch),
+			Object: &github.GitObject{SHA: new(mainSha)},
 		},
+		false,
 		false,
 	)
 
@@ -67,9 +67,10 @@ func TestAccResolveCmd(t *testing.T) {
 	_, _, err = client.UpdateRefName(
 		testTag,
 		&github.Reference{
-			Ref:    github.String("refs/tags/" + testTag),
-			Object: &github.GitObject{SHA: github.Ptr(mainSha)},
+			Ref:    new("refs/tags/" + testTag),
+			Object: &github.GitObject{SHA: new(mainSha)},
 		},
+		false,
 		false,
 	)
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v84/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -125,7 +125,7 @@ func runTagCmd(cmd *cobra.Command, args []string) (err error) {
 
 	tagRef := &github.Reference{
 		Ref:    &tagRefName,
-		Object: &github.GitObject{SHA: github.Ptr(targetSha)},
+		Object: &github.GitObject{SHA: new(targetSha)},
 	}
 
 	tagObj, err := client.GetTagObj(tagRefName)
