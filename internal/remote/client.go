@@ -863,8 +863,9 @@ func (c *Client) ListDeploymentsV3(sha, environment string) ([]DeploymentInfo, e
 	return deploymentInfos, nil
 }
 
-// CreateDeploymentV3 creates a deployment using REST API (hybrid approach)
-func (c *Client) CreateDeploymentV3(ref, environment, description string, transient, production bool) (*DeploymentInfo, error) {
+// CreateDeploymentV3 creates a deployment using REST API (hybrid approach).
+// When bypassChecks is true, required_contexts is set to an empty slice to bypass branch protection status checks.
+func (c *Client) CreateDeploymentV3(ref, environment, description string, transient, production, bypassChecks bool) (*DeploymentInfo, error) {
 	deploymentReq := &github.DeploymentRequest{
 		Ref:                   &ref,
 		Environment:           &environment,
@@ -874,6 +875,11 @@ func (c *Client) CreateDeploymentV3(ref, environment, description string, transi
 
 	if description != "" {
 		deploymentReq.Description = &description
+	}
+
+	if bypassChecks {
+		emptyContexts := []string{}
+		deploymentReq.RequiredContexts = &emptyContexts
 	}
 
 	deployment, _, err := c.V3.Repositories.CreateDeployment(c.context, c.repo.Owner, c.repo.Name, deploymentReq)
