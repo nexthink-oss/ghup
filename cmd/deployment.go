@@ -55,6 +55,7 @@ func cmdDeployment() *cobra.Command {
 
 	flags.BoolP("transient", "T", false, "transient environment")
 	flags.BoolP("production", "P", false, "production environment")
+	flags.Bool("bypass-checks", false, "bypass branch protection status checks when creating deployment")
 	flags.String("description", "", "deployment description")
 	flags.String("environment-url", "", "environment URL")
 
@@ -141,9 +142,10 @@ func runDeploymentCmd(cmd *cobra.Command, args []string) error {
 			transient := viper.GetBool("transient")
 			production := viper.GetBool("production")
 			description := viper.GetString("description")
+			bypassChecks := viper.GetBool("bypass-checks")
 
 			log.Infof("creating deployment for %s in %s environment", commitish, environment)
-			deployment, err = client.CreateDeploymentV3(commitish, environment, description, transient, production)
+			deployment, err = client.CreateDeploymentV3(commitish, environment, description, transient, production, bypassChecks)
 			if err != nil {
 				output.SetError(fmt.Errorf("creating deployment: %w", err))
 				return cmdOutput(cmd, output)

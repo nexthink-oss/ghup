@@ -21,6 +21,7 @@ type deploymentTestArgs struct {
 	Production     bool
 	Description    string
 	EnvironmentURL string
+	BypassChecks   bool
 	DryRun         bool
 }
 
@@ -53,6 +54,10 @@ func (s *deploymentTestArgs) Slice() []string {
 
 	if s.EnvironmentURL != "" {
 		args = append(args, "--environment-url", s.EnvironmentURL)
+	}
+
+	if s.BypassChecks {
+		args = append(args, "--bypass-checks")
 	}
 
 	if s.DryRun {
