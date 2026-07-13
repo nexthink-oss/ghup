@@ -43,15 +43,3 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-brews:
-  - repository:
-      owner: isometry
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    description: A GitHub API client for managing tags and repository content from third-party automation systems
-    homepage: https://just.breathe.io/project/ghup/
-    test: |
-      system "#{bin}/ghup --help"
-    install: |
-      bin.install "ghup"

@@ -123,7 +123,7 @@ func runDeploymentCmd(cmd *cobra.Command, args []string) error {
 
 	// Check if deployment already exists
 	var deployment *remote.DeploymentInfo
-	var deploymentID string = "1" // Default for dry-run mode
+	var deploymentID = "1" // Default for dry-run mode
 
 	if !dryRun {
 		deployments, err := client.ListDeploymentsV3(targetSha, environment)

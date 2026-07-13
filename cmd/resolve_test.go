@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/go-github/v84/github"
+	"github.com/google/go-github/v89/github"
 
 	"github.com/nexthink-oss/ghup/cmd"
 	"github.com/nexthink-oss/ghup/internal/util"
