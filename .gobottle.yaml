@@ -1,0 +1,18 @@
+formula:
+  name: ghup
+  description: A GitHub API client for managing tags and repository content from third-party automation systems
+  homepage: https://just.breathe.io/project/ghup/
+  install:
+    completions: true
+  test:
+    raw: |
+      system "#{bin}/ghup --help"
+
+source:
+  type: local
+
+registry:
+  owner: isometry
+
+tap:
+  owner: isometry

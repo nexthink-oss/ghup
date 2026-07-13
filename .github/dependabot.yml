@@ -6,12 +6,30 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
+
   - package-ecosystem: "npm"
-    directories:
-      - "actions/*/"
+    directory: "/actions/setup"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
+    groups:
+      setup:
+        patterns: ["*"]
+
+  - package-ecosystem: "npm"
+    directory: "/actions/fast-forward"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    groups:
+      fast-forward:
+        patterns: ["*"]
