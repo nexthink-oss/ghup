@@ -678,7 +678,6 @@ func (c *Client) UpdatePullRequestV4(pullRequest *PullRequest) error {
 		if err != nil {
 			log.Warnf("failed to enable auto-merge for pull request #%d: %v", pullRequest.Number, err)
 			// Don't fail the entire operation if auto-merge fails
-			err = nil
 		}
 	}
 
