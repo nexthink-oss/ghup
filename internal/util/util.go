@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -176,8 +178,9 @@ func BuildTrailers() (trailers []string) {
 			trailers = append(trailers, fmt.Sprintf("%s: %s", trailerKey, strings.Join(userParts, " ")))
 		}
 	}
-	for key, value := range viper.GetStringMapString("trailer") {
-		trailers = append(trailers, fmt.Sprintf("%s: %s", key, value))
+	trailerMap := viper.GetStringMapString("trailer")
+	for _, key := range slices.Sorted(maps.Keys(trailerMap)) {
+		trailers = append(trailers, fmt.Sprintf("%s: %s", key, trailerMap[key]))
 	}
 	return
 }
