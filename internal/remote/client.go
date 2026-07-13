@@ -11,7 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
-	"github.com/google/go-github/v84/github"
+	"github.com/google/go-github/v89/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/viper"
 	"golang.org/x/oauth2"
@@ -89,11 +89,19 @@ func NewClient(ctx context.Context, repo *Repo) (*Client, error) {
 	httpClient := oauth2.NewClient(ctx, src)
 	rateLimiter := github_ratelimit.NewClient(httpClient.Transport)
 
+	// rate limiting is handled by the gofri round-tripper
+	v3, err := github.NewClient(
+		github.WithHTTPClient(rateLimiter),
+		github.WithDisableRateLimitCheck(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	client := &Client{
-		// disable go-github's built-in rate limiting
-		context: context.WithValue(ctx, github.BypassRateLimitCheck, true),
+		context: ctx,
 		repo:    repo,
-		V3:      github.NewClient(rateLimiter),
+		V3:      v3,
 		V4:      githubv4.NewClient(rateLimiter),
 	}
 
@@ -866,8 +874,8 @@ func (c *Client) ListDeploymentsV3(sha, environment string) ([]DeploymentInfo, e
 // CreateDeploymentV3 creates a deployment using REST API (hybrid approach).
 // When bypassChecks is true, required_contexts is set to an empty slice to bypass branch protection status checks.
 func (c *Client) CreateDeploymentV3(ref, environment, description string, transient, production, bypassChecks bool) (*DeploymentInfo, error) {
-	deploymentReq := &github.DeploymentRequest{
-		Ref:                   &ref,
+	deploymentReq := github.DeploymentRequest{
+		Ref:                   ref,
 		Environment:           &environment,
 		TransientEnvironment:  &transient,
 		ProductionEnvironment: &production,
@@ -878,8 +886,7 @@ func (c *Client) CreateDeploymentV3(ref, environment, description string, transi
 	}
 
 	if bypassChecks {
-		emptyContexts := []string{}
-		deploymentReq.RequiredContexts = &emptyContexts
+		deploymentReq.RequiredContexts = []string{}
 	}
 
 	deployment, _, err := c.V3.Repositories.CreateDeployment(c.context, c.repo.Owner, c.repo.Name, deploymentReq)
@@ -903,8 +910,8 @@ func (c *Client) CreateDeploymentV3(ref, environment, description string, transi
 
 // CreateDeploymentStatusV3 creates a deployment status using REST API (hybrid approach)
 func (c *Client) CreateDeploymentStatusV3(deploymentID, state, description, environment, environmentURL string) (int64, error) {
-	statusReq := &github.DeploymentStatusRequest{
-		State: &state,
+	statusReq := github.DeploymentStatusRequest{
+		State: state,
 	}
 
 	if description != "" {
