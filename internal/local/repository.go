@@ -34,9 +34,6 @@ type DeletionSet map[string]struct{}
 
 // SetDefaults implements defaults.Setter interface
 func (r *Repository) SetDefaults() {
-	// EnableDotGitCommonDir is required for linked worktrees (git worktree),
-	// where config, refs and objects live in the parent repository's common
-	// directory rather than the worktree's own gitdir.
 	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
 	repo, err := git.PlainOpenWithOptions(r.Path, options)
 	if err != nil {
