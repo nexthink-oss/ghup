@@ -1,6 +1,10 @@
 package local
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -203,5 +207,90 @@ func TestParseRemote_Examples(t *testing.T) {
 				t.Errorf("parseRemote() gotRepo = %v, want %v", gotRepo, tt.wantRepo)
 			}
 		})
+	}
+}
+
+// TestRepository_LinkedWorktree verifies that ghup works from a linked git
+// worktree (created with `git worktree add`), where the .git entry is a file
+// pointing into the parent repository's .git/worktrees/<name> directory and
+// most repository data (config, refs, objects) lives in the common directory.
+func TestRepository_LinkedWorktree(t *testing.T) {
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git binary not available")
+	}
+
+	tmp := t.TempDir()
+	mainDir := filepath.Join(tmp, "main")
+	worktreeDir := filepath.Join(tmp, "wt")
+
+	git := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(gitPath, args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_CONFIG_GLOBAL=/dev/null",
+			"GIT_CONFIG_SYSTEM=/dev/null",
+			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+
+	if err := os.Mkdir(mainDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git(mainDir, "init", "--initial-branch=main")
+	git(mainDir, "remote", "add", "origin", "https://github.com/test-owner/test-repo.git")
+	for name, content := range map[string]string{
+		"staged.txt":    "original\n",
+		"untouched.txt": "untouched\n",
+	} {
+		if err := os.WriteFile(filepath.Join(mainDir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git(mainDir, "add", ".")
+	git(mainDir, "commit", "--no-gpg-sign", "-m", "initial")
+	git(mainDir, "worktree", "add", worktreeDir, "-b", "feature")
+
+	// stage a change in the linked worktree
+	if err := os.WriteFile(filepath.Join(worktreeDir, "staged.txt"), []byte("updated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(worktreeDir, "add", "staged.txt")
+
+	repo := &Repository{Path: worktreeDir}
+	repo.SetDefaults()
+
+	if repo.Repository == nil {
+		t.Fatal("SetDefaults() failed to open linked worktree")
+	}
+	if repo.Branch != "feature" {
+		t.Errorf("Branch = %q, want %q", repo.Branch, "feature")
+	}
+	if repo.Owner != "test-owner" || repo.Name != "test-repo" {
+		t.Errorf("Owner/Name = %q/%q, want test-owner/test-repo (remote lookup requires the common directory's config)", repo.Owner, repo.Name)
+	}
+
+	status, err := repo.Status()
+	if err != nil {
+		t.Fatalf("Status() error: %v", err)
+	}
+
+	pathContent, deletionSet, err := repo.Staged(status)
+	if err != nil {
+		t.Fatalf("Staged() error: %v", err)
+	}
+	if len(deletionSet) != 0 {
+		t.Errorf("Staged() deletionSet = %v, want empty", deletionSet.Keys())
+	}
+	if want := []string{"staged.txt"}; !slices.Equal(pathContent.Keys(), want) {
+		t.Errorf("Staged() paths = %v, want %v (unstaged tracked files must not be reported)", pathContent.Keys(), want)
+	}
+	if got := string(pathContent["staged.txt"]); got != "updated\n" {
+		t.Errorf("Staged() content = %q, want %q", got, "updated\n")
 	}
 }
