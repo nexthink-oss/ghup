@@ -34,7 +34,7 @@ type DeletionSet map[string]struct{}
 
 // SetDefaults implements defaults.Setter interface
 func (r *Repository) SetDefaults() {
-	options := &git.PlainOpenOptions{DetectDotGit: true}
+	options := &git.PlainOpenOptions{DetectDotGit: true, EnableDotGitCommonDir: true}
 	repo, err := git.PlainOpenWithOptions(r.Path, options)
 	if err != nil {
 		return
