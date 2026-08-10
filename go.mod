@@ -6,7 +6,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/chainguard-dev/git-urls v1.0.2
 	github.com/creasty/defaults v1.8.0
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/goccy/go-yaml v1.19.2
 	github.com/gofri/go-github-ratelimit/v2 v2.0.2
 	github.com/google/go-github/v89 v89.0.0
